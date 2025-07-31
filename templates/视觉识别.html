@@ -1,0 +1,437 @@
+<html>  
+    <head>
+        <title>视频流识别</title>
+        <meta charset="UTF-8">
+        <style>
+
+        </style>
+      
+    </head>
+    <body>
+        {% raw %} {{ request }} {% endraw %}
+        <h1>视频流识别</h1>
+        <H4>额外扩展所作</H4>
+        <p>依旧是半成品</p>
+        <p>使用yolov5-blazeface进行人脸检测，glintasia_r50进行人脸检测，mediapipe进行手势识别</p>
+        <p>受树莓派32-bit的cpu所限，无法进行部署，所以之后就走上了前后端的路子</p>
+        <p>既然把后端和api都整好了，就去写个网页试试（</p>
+        <p>之后会尝试写一个网页端应用用于收集人脸数据</p>
+
+        <input type="checkbox" id="CheckSwitch" checked >
+        <label for="CheckSwitch">开启人脸检测</label>
+        
+        
+        <input type="checkbox" id="NmsSwitch" checked >
+        <label for="NmsSwitch">开启极大值抑制</label>
+
+        
+        <input type="checkbox" id="HandsSwitch" >
+        <label for="HandsSwitch">开启手势检测</label>
+
+        
+        <input type="checkbox" id="FaceSwitch" >
+        <label for="FaceSwitch">开启人脸识别(建议打开极大值抑制)</label>
+
+        <input type="checkbox" id="ImgSwitch" >
+        <label for="ImgSwitch">开启特效(需开启手势识别)</label>
+    
+        <input id="SimInput" style="width:5%;height:25px;font-size: 23px;" placeholder="0.8">
+        <label>相似度    </label>
+        <br>
+        <button id="CutBtn">获取输出</button>
+
+        
+
+
+        <div id="error_show" style="width: 500px; height: 300px; border: 1px solid #aaa; padding: 10px; overflow-y: auto; position: fixed;bottom: 80px;right: 80px;">
+            状态输出区域
+        </div>
+
+        <script>
+            //全局变量
+            var error_dict={};
+            var error_last={};
+            var result_dict={};
+            var all_fps=0;
+            var start_time=0;
+
+        </script>
+
+        
+        <script>
+            //获取摄像头
+            navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+                video.play(); 
+            })
+            .catch(err => {
+                console.error('无法获取摄像头', err);
+                if(error_dict[`${err.name}`])  
+                {error_dict[`${err.name}`]=`${err}`;}
+            });
+        
+        </script>
+
+        
+        <video id="video" autoplay playsinline width="640" height="480" style="position:absolute; top: 450px;; left: 10px;; z-index:0;"></video>
+        <canvas id="overlay" width="640" height="480" style="position:absolute; top: 450px; left: 10px;; z-index:1;"></canvas>
+
+        <script>
+            const canvasWait = document.getElementById("overlay");
+            const ctxWait = canvasWait.getContext("2d");
+            ctxWait.fillStyle = "black";
+            ctxWait.font = "20px ";
+            ctxWait.fillText(`等待加载`, 200, 50);
+            
+        </script>
+        
+        <script>
+            var PostIp='';
+            let th=0;
+            let ipflag=false
+            const ip_list=["http://10.93.64.19:8000/","http://192.168.0.100:8000/","http://localhost:8000/"];
+            async function CheckIp() {
+            for(th=0;th<ip_list.length;th++){
+                let url = ip_list[th] + "img/up";
+                try {
+                    const response = await fetch(url, { method: 'GET', mode: 'cors' });
+                    if (response.ok) {
+                        PostIp=ip_list[th];
+                        ipflag=true
+                        break;
+                    }
+                }
+                catch(e){
+                continue;
+                }
+            }
+            if(!ipflag){
+                error_dict["IpError"]="无法连接到任何ip"
+            }
+        }
+        CheckIp();
+
+        </script>
+
+        <script>
+            const canvas = document.getElementById("overlay");
+            const ctx = canvas.getContext("2d");
+
+            let CheckSwitch = document.getElementById('CheckSwitch');
+            let NmsSwitch = document.getElementById('NmsSwitch');
+            let FaceSwitch = document.getElementById('FaceSwitch');
+            let HandsSwitch = document.getElementById('HandsSwitch');
+            let ImgSwitch = document.getElementById('ImgSwitch');
+            let numValue = parseInt(document.getElementById('SimInput').value) || 0.8;
+            
+            //按键绑定
+            let CheckBefore1 = CheckSwitch.checked;
+            let CheckBefore2 = CheckSwitch.checked;
+
+            let HandsBefore = HandsSwitch.checked;
+            
+            //NMS与人脸检测绑定
+            NmsSwitch.addEventListener('change', () => {
+                if (NmsSwitch.checked) {
+                    CheckBefore1 = CheckSwitch.checked;
+                    CheckSwitch.checked = true;
+                }
+                else{CheckSwitch.checked = CheckBefore1}
+            });
+
+            //人脸识别与人脸检测绑定
+            FaceSwitch.addEventListener('change', () => {
+                if (FaceSwitch.checked) {
+                    CheckBefore2 = CheckSwitch.checked;
+                    CheckSwitch.checked = true;
+                }
+                else{CheckSwitch.checked = CheckBefore2}
+            });
+            //特效和是手势识别绑定
+            ImgSwitch.addEventListener('change', () => {
+                if (ImgSwitch.checked) {
+                    HandsBefore = HandsSwitch.checked;
+                    HandsSwitch.checked = true;
+                }
+                else{HandsSwitch.checked = HandsBefore}
+            });
+
+            let emojiCache = {};
+
+            async function loadEmojis() {
+                if(ImgSwitch.checked)
+                {
+                    const imgUrl=PostIp+"img/"
+                    const name_list=["up","down","lookdown","ok"]
+                    for(let i=0;i<name_list.length;i++)
+                    {
+                        try{
+                            const res = await fetch(`${imgUrl}${name_list[i]}`);
+                            if (!res.ok)throw new Error(`加载失败: ${name}`);
+                            const blob = await res.blob();
+                            const img = new Image();
+                            img.onload = () => {
+                                URL.revokeObjectURL(img.src);  // 释放内存
+                                console.log(`图片 ${name_list[i]} 加载完成`);
+                            };
+                            img.src = URL.createObjectURL(blob);
+                            emojiCache[name_list[i]] = img;
+                        }
+                        catch(err){
+                            console.log(err)
+                            if(error_dict[`${err.name}`])  
+                            {error_dict[`${err.name}`]=`${err}`;}
+                        }
+                        
+                        }
+                    }
+                }
+            loadEmojis()
+
+            //获取视频帧，并回调处理发送和绘画
+            function getframe() {
+                if (!video || video.readyState < 2) {  // 视频未准备好
+                console.log("视频未准备好");
+                return;
+            }
+            //开始时间
+            start_time = Date.now();
+
+            const canvasframe = document.createElement('canvas');
+            canvasframe.width = video.videoWidth;
+            canvasframe.height = video.videoHeight;
+            const ctxframe = canvasframe.getContext('2d');
+            ctxframe.drawImage(video, 0, 0);  // 把当前帧绘制到 canvas 上
+
+            // 转为blob
+            canvasframe.toBlob(
+                function(blob) {
+                    //回调函数，和lambda差不多，自动调用
+                const formData = new FormData();
+                formData.append("img", blob, "image.jpg");
+
+                // 动态添加请求选项
+                if (CheckSwitch.checked) formData.append("use_onnx", "true");
+                if (NmsSwitch.checked)   formData.append("use_nms", "true");
+                if (HandsSwitch.checked) formData.append("use_hand", "true");
+                if (FaceSwitch.checked)  formData.append("use_face", "true");
+                if (ImgSwitch.checked)   formData.append("use_img", "true");
+                formData.append("num", numValue);
+
+                // 发送图像数据
+                sendpost(formData);
+                },
+                'image/jpeg'
+            );
+
+
+                }
+
+            function sendpost(formData) {
+                if(PostIp!=''){
+                fetch(`${PostIp}`+"infer/", {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // 在控制台打印响应数据
+                    //console.log(data);
+                    const cutbtn = document.getElementById("CutBtn");
+                    cutbtn.addEventListener("click", () => {
+                        //result_dict=data;
+                        dict_show(data);
+                    });
+
+                drawResult(data);
+                // 递归发送图像数据
+
+                //sendpost(formData);
+                            //计算帧率
+                const end_time=Date.now();
+                const all_time=(end_time-start_time)/1000;
+                all_fps=1/all_time;
+                
+                ctx.fillStyle = "blue";
+                ctx.font = "30px Arial";
+                ctx.fillText(`${all_fps}`, 550, 100);
+
+                
+            }
+            )}
+        } 
+    
+            function drawResult(result){
+                const video = document.getElementById("video");
+                const HandsSwitch = document.getElementById('HandsSwitch');
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                let flag1_toe=false//检察大拇指
+                let flag1_up=false//大拇指上下
+                let flag1_down=false
+
+                let flag2_lookdown=false//检察中指
+                let flag_ok=false
+
+                                //手部节点
+                if (result.hands) {
+                    result.hands.forEach(hand => {
+                        const color = hand.label === "Left" ? "yellow" : "blue";
+                        ctx.fillStyle = color;
+                        const landmarks = hand.landmarks || [];
+
+                        hand.landmarks.forEach(point => {
+                            ctx.beginPath();
+                            ctx.arc(point.x, point.y, 3, 0, Math.PI * 2);
+                            ctx.fill();
+                        });
+                        if(ImgSwitch.checked){
+                        if (!flag1_toe) {
+                            if (landmarks[3]["x"] > 0 && landmarks[3]["y"] > 0) {
+                                const x0 = landmarks[0]["x"], y0 = landmarks[0]["y"];
+                                const s = Math.hypot(landmarks[4]["x"] - x0, landmarks[4]["y"] - y0);
+
+                                if (
+                                    Math.hypot(landmarks[12]["x"] - x0, landmarks[12]["y"] - y0) < s &&
+                                    Math.hypot(landmarks[8]["x"] - x0, landmarks[8]["y"] - y0) < s &&
+                                    Math.hypot(landmarks[16]["x"] - x0, landmarks[16]["y"] - y0) < s &&
+                                    Math.hypot(landmarks[20]["x"] - x0, landmarks[20]["y"] - y0) < s
+                                ) {
+                                    flag1_toe = true;
+                                }
+                            }
+                        }
+
+                        if (flag1_toe) {
+                            const x0 = landmarks[0]["x"], y0 = landmarks[0]["y"];
+                            const x1 = landmarks[5]["x"], y1 = landmarks[5]["y"];
+                            if (landmarks[4]["y"] < y0 && landmarks[4]["y"] < y1) {
+                                flag1_up = true;
+                            } else {
+                                flag1_down = true;
+                            }
+                        }
+
+                        if (!flag2_lookdown) {
+                            if (landmarks[12]["x"] > 0 && landmarks[12]["y"] > 0) {
+                                const x0 = landmarks[0]["x"], y0 = landmarks[0]["y"];
+                                const s = Math.hypot(landmarks[12]["x"] - x0, landmarks[12]["y"] - y0);
+
+                                if (
+                                    Math.hypot(landmarks[4]["x"] - x0, landmarks[4]["y"] - y0) < s &&
+                                    Math.hypot(landmarks[8]["x"] - x0, landmarks[8]["y"] - y0) < s &&
+                                    Math.hypot(landmarks[16]["x"] - x0, landmarks[16]["y"] - y0) < s &&
+                                    Math.hypot(landmarks[20]["x"] - x0, landmarks[20]["y"] - y0) < s
+                                ) {
+                                    flag2_lookdown = true;
+                                }
+                            }
+                        }
+
+                        if (!flag_ok) {
+                            if (
+                                landmarks[4]["x"] > 0 && landmarks[4]["y"] > 0 &&
+                                landmarks[8]["x"] > 0 && landmarks[8]["y"] > 0
+                            ) {
+                                const s = Math.hypot(
+                                    landmarks[8]["x"] - landmarks[4]["x"],
+                                    landmarks[8]["y"] - landmarks[4]["y"]
+                                );
+                                const s1 = Math.hypot(
+                                    landmarks[12]["x"] - landmarks[8]["x"],
+                                    landmarks[12]["y"] - landmarks[8]["y"]
+                                );
+                                const s2 = Math.hypot(
+                                    landmarks[16]["x"] - landmarks[12]["x"],
+                                    landmarks[16]["y"] - landmarks[12]["y"]
+                                );
+                                const s3 = Math.hypot(
+                                    landmarks[20]["x"] - landmarks[16]["x"],
+                                    landmarks[20]["y"] - landmarks[16]["y"]
+                                );
+
+                                if (s < s1 && s < s2 && s < s3) {
+                                    flag_ok = true;
+                                }
+                            }
+                        }
+                    }
+                    });
+                }
+
+                                //人脸标签
+                if (result.faces && result.boxes) {
+                    result.faces.forEach((faceName, index) => {
+                        const box = result.boxes[index];
+                        if (box) {
+                            const x = (box.x1 + box.x2) / 2;
+                            const y = box.y1 - 30;
+                            ctx.fillStyle = "red";
+                            ctx.font = "30px Arial";
+                            ctx.fillText(faceName, x, y);
+                        }
+                    });
+                }
+
+                //识别框
+                if (result.boxes) {
+                    result.boxes.forEach(box => {
+                        const {x1, y1, x2, y2, confidence} = box;
+                        ctx.strokeStyle = "red";
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+                        ctx.fillStyle = "red";
+                        ctx.font = "14px Arial";
+                        ctx.fillText(`conf: ${confidence.toFixed(2)}`, x2, y2 - 5);
+                        
+                        if(ImgSwitch.checked){
+                        let img = null;
+                        if(flag1_up){img=emojiCache["up"]}
+                        else if(flag1_down){img=emojiCache["down"]}
+                        else if(flag2_lookdown){img=emojiCache["lookdown"]}
+                        else if(flag_ok){img=emojiCache["ok"]};
+                        if (img)
+                        {
+                             ctx.drawImage(img, x1, y1, Math.abs(x1-x2), Math.abs(y1-y2));
+                        }
+                        }
+
+                    });
+                }
+
+            if(JSON.stringify(error_dict) !== JSON.stringify(error_last))
+            {
+                dict_show(error_dict);
+                error_last=error_dict;
+            }
+
+
+
+
+            }
+
+
+            function dict_show(newdict){
+                const div = document.getElementById("error_show");
+                div.innerHTML = ''; 
+
+                for (const [key, value] of Object.entries(newdict))
+                {
+                    const line = document.createElement("div");
+
+                    if (typeof value === 'object' && value !== null) {
+                        line.textContent = `${key}: ${JSON.stringify(value, null, 2)}`;
+                    } else {
+                        line.textContent = `${key}: ${value}`;
+                    }
+                    div.appendChild(line);
+                }
+                
+            }
+            setInterval(getframe, 50);
+        </script>
+
+    </body>
+</html>
