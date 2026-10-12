@@ -2,3 +2,5 @@
 Data/FaceEmbedding/
 Model/
 __pycache__/
+dev/attendance.db
+Front/vendor/
