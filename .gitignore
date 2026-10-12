@@ -1,0 +1,4 @@
+.vscode/
+Data/FaceEmbedding/
+Model/
+__pycache__/
