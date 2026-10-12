@@ -14,11 +14,11 @@ from numpy.typing import NDArray
 
 from typing import Any, List, Union, Dict, Tuple, Optional
 
-# ---- Https 变体: 静态目录按本文件定位, base1 走父目录 (Model/Data 相对路径依赖 cwd=项目根) ----
+# ---- Https 变体: 静态目录按本文件定位, back 走父目录 (Model/Data 相对路径依赖 cwd=项目根) ----
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # .../Https
 sys.path.insert(0, os.path.dirname(BASE_DIR))
 
-from base1 import FaceRecognition
+from Back import FaceRecognition
 
 from fastapi import FastAPI,UploadFile,File, Form,Request
 from contextlib import asynccontextmanager
