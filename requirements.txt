@@ -5,6 +5,7 @@ python-multipart
 jinja2
 starlette
 markdown  # /readme 文档渲染用 (缺则回退原样<pre>显示)
+requests  # Front/front_py.py 调用后端 /infer/* 用
 
 # ---- 数值 / 图像 ----
 numpy
@@ -16,6 +17,5 @@ opencv-python
 onnxruntime-gpu
 mediapipe
 
-
-#---- 杂项 ----
-markdown
+# ---- 证书 ----
+cryptography  # tools/gen_cert.py 自签证书用

@@ -47,7 +47,7 @@ del "%TEMP%\vi_models.flag" 2>nul
 start "vi-models" /b "%PYTHON%" "%ROOT%\tools\download_models.py" --root "%ROOT%" --workers 4 --log "%TEMP%\vi_models.log" --rc-file "%TEMP%\vi_models.flag"
 echo [2/4] 安装依赖 (requirements.txt) ...
 set "PIP_RC=0"
-"%PYTHON%" -c "import fastapi,uvicorn,cv2,numpy,onnxruntime,mediapipe" >nul 2>nul
+"%PYTHON%" -c "import fastapi,uvicorn,cv2,numpy,onnxruntime,mediapipe,requests,cryptography" >nul 2>nul
 if not errorlevel 1 (
   echo [2/4] 依赖已齐备, 跳过 pip 安装。
   goto :pip_done
@@ -117,17 +117,33 @@ if errorlevel 1 (
   echo [提示] 未找到 conda 命令, 跳过 conda 环境。
   goto :conda_empty
 )
-conda run -n "%CONDA_ENV%" python --version >nul 2>nul
-if errorlevel 1 (
-  echo [提示] conda 环境 "%CONDA_ENV%" 不存在。可用环境如下:
-  conda env list
+rem 直接定位该环境的 python.exe (不用 conda run, 输出唯一、无激活开销)
+set "CONDA_BASE="
+for /f "delims=" %%b in ('conda info --base 2^>nul') do if not defined CONDA_BASE set "CONDA_BASE=%%b"
+if not defined CONDA_BASE (
+  echo [提示] conda 不可用, 跳过 conda 环境。
   goto :conda_empty
 )
-for /f "delims=" %%p in ('conda run -n "%CONDA_ENV%" python -c "import sys; print(sys.executable)" 2^>nul') do set "PYTHON=%%p"
-if defined PYTHON echo [conda] 已切换到环境 "%CONDA_ENV%": %PYTHON%
+if /i "%CONDA_ENV%"=="base" (
+  set "PYTHON=%CONDA_BASE%\python.exe"
+) else (
+  set "PYTHON=%CONDA_BASE%\envs\%CONDA_ENV%\python.exe"
+)
+if not exist "%PYTHON%" (
+  echo [提示] conda 环境 "%CONDA_ENV%" 不存在。可用环境如下:
+  call conda env list
+  goto :conda_empty
+)
+"%PYTHON%" --version >nul 2>nul
+if errorlevel 1 (
+  echo [提示] 该 Python 无法运行: %PYTHON%
+  goto :conda_empty
+)
+echo [conda] 已使用环境 "%CONDA_ENV%": %PYTHON%
 exit /b 0
 :conda_empty
 set "CONDA_ENV="
+set "PYTHON="
 exit /b 0
 
 :use_global
@@ -185,39 +201,33 @@ if exist "%ROOT%\certs\key.pem" if exist "%ROOT%\certs\cert.pem" exit /b 0
 echo [证书] 未找到自签证书, 正在自动签发 ...
 if not exist "%ROOT%\certs" mkdir "%ROOT%\certs"
 call :get_ip
-where openssl >nul 2>nul
-if not errorlevel 1 (
-  openssl req -x509 -newkey rsa:2048 -keyout "%ROOT%\certs\key.pem" -out "%ROOT%\certs\cert.pem" -days 825 -nodes -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:%LOCAL_IP%"
-  if not errorlevel 1 if exist "%ROOT%\certs\key.pem" if exist "%ROOT%\certs\cert.pem" (
-    echo [证书] 已签发 (openssl, SAN 含 %LOCAL_IP%).
-    exit /b 0
-  )
-  echo [提示] openssl 签发失败, 改用 Python 方式 ...
-)
+rem ---- 首选 Python 方式 (tools/gen_cert.py, 不依赖 openssl, 最稳; 依赖见 requirements.txt, 此处不装包) ----
 "%PYTHON%" -c "import cryptography" >nul 2>nul
 if errorlevel 1 (
-  echo [证书] 安装 cryptography ...
-  "%PYTHON%" -m pip install -q cryptography
-  if errorlevel 1 (
-    echo [错误] cryptography 安装失败, 请手动放置 certs\key.pem + cert.pem 后重试。
-    exit /b 1
-  )
+  echo [提示] 缺少 cryptography (requirements.txt 未装全), 改用 openssl 方式 ...
+  goto :cert_openssl
 )
 "%PYTHON%" "%ROOT%\tools\gen_cert.py" --out-dir "%ROOT%\certs" --ip "%LOCAL_IP%"
+if not errorlevel 1 if exist "%ROOT%\certs\key.pem" if exist "%ROOT%\certs\cert.pem" (
+  echo [证书] 已签发 (Python, SAN 含 %LOCAL_IP%).
+  exit /b 0
+)
+echo [提示] Python 签发失败, 改用 openssl 方式 ...
+:cert_openssl
+rem ---- 备用 openssl 方式 (conda 自带 openssl 缺默认 cnf, 置空 OPENSSL_CONF 绕过; 已验证可用) ----
+where openssl >nul 2>nul
 if errorlevel 1 (
-  echo [错误] 证书签发失败, 请手动放置 certs\key.pem + cert.pem 后重试。
+  echo [错误] 两种签发方式均不可用, 请手动放置 certs\key.pem + cert.pem 后重试。
   exit /b 1
 )
-if not exist "%ROOT%\certs\key.pem" (
-  echo [错误] 证书文件未生成, 请手动放置后重试。
-  exit /b 1
+set "OPENSSL_CONF=NUL"
+openssl req -x509 -newkey rsa:2048 -keyout "%ROOT%\certs\key.pem" -out "%ROOT%\certs\cert.pem" -days 825 -nodes -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:%LOCAL_IP%"
+if not errorlevel 1 if exist "%ROOT%\certs\key.pem" if exist "%ROOT%\certs\cert.pem" (
+  echo [证书] 已签发 (openssl, SAN 含 %LOCAL_IP%).
+  exit /b 0
 )
-if not exist "%ROOT%\certs\cert.pem" (
-  echo [错误] 证书文件未生成, 请手动放置后重试。
-  exit /b 1
-)
-echo [证书] 已签发 (Python, SAN 含 %LOCAL_IP%).
-exit /b 0
+echo [错误] 证书签发失败, 请手动放置 certs\key.pem + cert.pem 后重试。
+exit /b 1
 
 :get_ip
 set "LOCAL_IP="

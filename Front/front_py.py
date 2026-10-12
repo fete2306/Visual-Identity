@@ -40,6 +40,8 @@ except ImportError:
     print("需要 requests: pip install requests")
     raise
 
+from Back import FaceCheckWithMediapipe
+
 # 让 Front/ 下的脚本能 import 到项目根目录的 base1 / app
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -273,7 +275,7 @@ def run_camera(args):
     checker = None
     if not args.remote_only:
         try:
-            from base1 import FaceCheckWithMediapipe
+            
             checker = FaceCheckWithMediapipe()
             print("[front_py] 本地 SCRFD + Mediapipe 加载成功, 检测在本地, 识别走 /infer/batch")
         except Exception as e:
