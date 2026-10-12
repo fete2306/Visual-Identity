@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Visual-Identity 前端 (HTML版, 调用 /infer/batch)</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 860px; margin: 20px auto; padding: 0 16px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
+  .stage { position: relative; max-width: 640px; }
+  .stage video { width: 100%; display: block; background: #111; border-radius: 8px; }
+  #overlay { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #canvas { width: 100%; max-width: 640px; background: #111; border-radius: 8px; }
+  #result { padding: 10px; border: 1px solid #ddd; border-radius: 8px; min-height: 2em; }
+  #log { font-size: 12px; color: #444; max-height: 180px; overflow: auto; border: 1px solid #eee; padding: 6px; }
+  #handStatus { font-size: 12px; color: #666; }
+  #fps { font-size: 12px; color: #666; font-variant-numeric: tabular-nums; }
+  select { padding: 6px; max-width: 260px; }
+  button { padding: 8px 14px; cursor: pointer; }
+  input[type=text] { width: 260px; padding: 6px; }
+</style>
+</head>
+<body>
+<h2>Visual-Identity 前端 <small style="color:#666">HTML 版 → POST <code>/infer/batch</code></small></h2>
+<p>Https 同源版: 后端与本页同域 (页面 <code>/front/front.html</code>, 接口 <code>/infer/*</code>)。后端启动 (cwd=项目根): <code>D:\conda\envs\cuda128\python.exe -m uvicorn Https.app:app --host 0.0.0.0 --port 8060 --ssl-keyfile certs\key.pem --ssl-certfile certs\cert.pem</code>。先开同域 <code>/docs</code> 点“继续前往”完成自签信任; 局域网用本机LAN IP(后端启动日志会打印)替换 127.0.0.1。识别走后端,检测框与手部点在本地画(对标 py 版)。</p>
+
+<div class="row">
+  <label>后端: <input type="text" id="server" value="https://127.0.0.1:8060" /></label>
+  <label>min_sim: <input type="range" id="minSim" min="0" max="1" step="0.05" value="0.4"
+    oninput="document.getElementById('minSimVal').textContent=this.value" />
+    <b id="minSimVal">0.4</b></label>
+</div>
+<div class="row">
+  <label>间隔(ms): <input type="text" id="interval" value="800" style="width:80px" /></label>
+  <label><input type="checkbox" id="useCrop" checked /> 本地裁剪全部人脸一次送检(对标 py 版 detect)</label>
+</div>
+<div class="row">
+  <label>人脸检测间隔(ms): <input type="text" id="faceInterval" value="120" style="width:70px" /></label>
+  <label>手部检测间隔(ms): <input type="text" id="handInterval" value="100" style="width:70px" /></label>
+</div>
+<div class="row">
+  <label><input type="checkbox" id="showBox" checked /> 显示人脸框</label>
+  <label><input type="checkbox" id="showHands" checked /> 显示手部点</label>
+</div>
+<div class="row">
+  <label>摄像头: <select id="camera" onchange="FrontJS.onCameraChange()"><option value="">加载中…</option></select></label>
+  <button onclick="FrontJS.onRefreshCameras()">刷新摄像头</button>
+  <span id="fps">FPS: 渲染 -- | 推理 --</span>
+</div>
+<div class="row">
+  <span id="faceStatus">人脸检测: 未启动</span>
+  <span id="handStatus">手部模型: 未启动</span>
+</div>
+<div class="row">
+  <button onclick="FrontJS.onTest()">测试后端连接</button>
+  <button onclick="FrontJS.onStart()">打开摄像头并连续推理</button>
+  <button onclick="FrontJS.onSingle()">单次推理</button>
+  <button onclick="FrontJS.stopCamera()">关闭摄像头</button>
+  <label>或传图: <input type="file" id="file" accept="image/*" onchange="FrontJS.onSingle()" /></label>
+</div>
+
+<div class="stage">
+  <video id="video" playsinline muted></video>
+  <canvas id="overlay"></canvas>
+</div>
+<canvas id="canvas" style="display:none"></canvas>
+<h3>识别结果</h3>
+<div class="row" style="font-size:12px;color:#555;margin:4px 0">
+  <span><i style="display:inline-block;width:12px;height:12px;background:#16a34a;border-radius:2px"></i> INFO 已识别</span>
+  <span><i style="display:inline-block;width:12px;height:12px;background:#eab308;border-radius:2px"></i> WARNING 未知(unknow)</span>
+  <span><i style="display:inline-block;width:12px;height:12px;background:#dc2626;border-radius:2px"></i> ERROR 跳过/失败(outOfrecognitionCount)</span>
+  <span><i style="display:inline-block;width:12px;height:12px;background:#9ca3af;border-radius:2px"></i> IDLE 无结果</span>
+</div>
+<div id="result">等待推理…</div>
+<h3>日志</h3>
+<div id="log"></div>
+
+<script src="./front.js"></script>
+<script>
+// 同源自动填: 经 https 同源 served 时后端地址默认同源 (理由: 同域无 mixed content/CORS, 开箱即用)
+(function () {
+  try {
+    if (location.protocol.indexOf("http") === 0 && location.origin.indexOf("null") !== 0) {
+      document.getElementById("server").value = location.origin;
+    }
+  } catch (e) {}
+})();
+</script>
+<script type="module">
+// 本地检测运行时: MediaPipe tasks-vision (FaceDetector BlazeFace + HandLandmarker),
+// 全部走 ./vendor/ 本地文件, 不需要联网 (首次 vendor 化时下载过一次即可)。
+import { FilesetResolver, HandLandmarker, FaceDetector } from "./vendor/tasks-vision/vision_bundle.mjs";
+window.__mpVision = {
+  FilesetResolver, HandLandmarker, FaceDetector,
+  wasmBase: "./vendor/tasks-vision/wasm",
+  handModel: "./vendor/hand_landmarker.task",
+  faceModel: "./vendor/blaze_face_short_range.tflite",
+};
+window.dispatchEvent(new Event("mp-vision-ready"));
+</script>
+</body>
+</html>
