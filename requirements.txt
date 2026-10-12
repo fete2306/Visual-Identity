@@ -1,0 +1,21 @@
+# ---- Web 框架 ----
+fastapi
+uvicorn[standard]
+python-multipart
+jinja2
+starlette
+markdown  # /readme 文档渲染用 (缺则回退原样<pre>显示)
+
+# ---- 数值 / 图像 ----
+numpy
+opencv-python
+
+# ---- 推理 ----
+# 代码中 providers=["CUDAExecutionProvider","CPUExecutionProvider"],
+# 有 NVIDIA GPU + CUDA 时用 onnxruntime-gpu; 无 GPU 改为 onnxruntime
+onnxruntime-gpu
+mediapipe
+
+
+#---- 杂项 ----
+markdown

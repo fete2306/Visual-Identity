@@ -1,6 +1,7 @@
 .vscode/
 Data/FaceEmbedding/
 Model/
+.virun
 __pycache__/
 dev/attendance.db
 Front/vendor/

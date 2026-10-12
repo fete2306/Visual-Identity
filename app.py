@@ -54,6 +54,30 @@ app.add_middleware(
 # 同源静态: https://host:8060/front/front.html (API 路由优先匹配, mount 只接剩下的)
 app.mount("/front", StaticFiles(directory=os.path.join(BASE_DIR, "Front"), html=True), name="front")
 
+# README 托管: https://host:8060/readme (有 markdown 库则渲染, 否则原样 <pre>)
+README_PATH = os.path.join(BASE_DIR, "README.md")
+if not os.path.isfile(README_PATH):
+    README_PATH = os.path.join(os.path.dirname(BASE_DIR), "README.md")
+
+@app.get("/readme", response_class=HTMLResponse)
+async def readme():
+    try:
+        with open(README_PATH, "r", encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return HTMLResponse("<h1>README.md 缺失</h1>", status_code=404)
+    try:
+        import markdown as _md
+        body = _md.markdown(text, extensions=["fenced_code", "tables"])
+    except Exception:
+        import html as _html
+        body = "<pre>" + _html.escape(text) + "</pre>"
+    return HTMLResponse(
+        "<!doctype html><html><head><meta charset='utf-8'>"
+        "<title>Visual-Identity README</title></head>"
+        "<body style='max-width:900px;margin:2em auto;font-family:sans-serif'>"
+        + body + "</body></html>")
+
 @app.post("/infer/batch")
 async def infer_batch(request: Request, min_sim: float = 0.4):
     t0 = time.time()
