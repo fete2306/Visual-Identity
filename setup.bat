@@ -17,11 +17,23 @@ set "CONDA_ENV="
 if not "%~1"=="" set "CONDA_ENV=%~1"
 set "PYTHON="
 
-rem ============ 1. Python 定位 ============
+rem ============ 1. Python 定位 (conda 名无效可重输; 回车或 global 走全局) ============
+:pick_python
 if not defined CONDA_ENV set /p "CONDA_ENV=请输入 conda 环境名(直接回车则使用全局 Python): "
-if defined CONDA_ENV call :use_conda
-if not defined PYTHON call :use_global
+if not defined CONDA_ENV goto :use_global_python
+if /i "%CONDA_ENV%"=="global" goto :use_global_python
+call :use_conda
+if defined PYTHON goto :python_ready
+echo [提示] 请重新输入有效的 conda 环境名 (回车则使用全局 Python)。
+echo.
+set "CONDA_ENV="
+goto :pick_python
+
+:use_global_python
+call :use_global
 if not defined PYTHON call :install_py310
+
+:python_ready
 if not defined PYTHON (
   echo [错误] 仍未找到可用 Python, 请手动安装 Python 3.10 后重试。
   pause

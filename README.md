@@ -72,7 +72,9 @@ Visual-Identity_r/
 
 1. 输入 conda 环境名（回车 = 全局 Python；都没有则自动装 Python 3.10），配置存 `.virun`；
 2. 依赖齐备则跳过 pip，否则前台安装；缺失模型后台多线程并行补全（大小 + SHA256 双校验），等待时实时回显进度；
-3. 缺证书自动签发（openssl 优先，否则装 cryptography 签，SAN 含本机局域网 IP）。
+3. 缺证书自动签发（`tools/gen_cert.py` 优先，openssl 备用；依赖来自 `requirements.txt`，此处不装包；SAN 含 localhost / 127.0.0.1 / 本机 IP）。
+
+注意：跑 `setup.bat` 前先关闭 VPN / 虚拟网卡（如 FlClash 等 TUN 类）。挂着它们时取到的是虚拟网卡 IP（如 `198.18.0.1`），会写进证书 SAN，局域网其他设备就连不上本机了。
 
 再双击 `start.bat` 选模式：`1` HTTPS 部署 / `2` 本地流程 / `3` 手势 demo / `4` 签到 demo。
 
@@ -110,7 +112,7 @@ python dev\demo_attendance.py    :: q退出
 
 ## 证书
 
-`certs/key.pem` + `cert.pem` 为自签证书（HTTPS 必备）。缺失由 `setup.bat` 自动签发（openssl → cryptography，SAN 含 localhost / 127.0.0.1 / 本机局域网 IP），也可手动放置或跑 `python tools/gen_cert.py --ip <局域网IP>`。`front_py.py` 默认校验 `certs/cert.pem`，对不上加 `--no-verify` 跳过。
+`certs/key.pem` + `cert.pem` 为自签证书（HTTPS 必备）。缺失由 `setup.bat` 自动签发（`tools/gen_cert.py` 优先，openssl 备用；SAN 含 localhost / 127.0.0.1 / 签发时本机 IP），也可手动放置或跑 `python tools/gen_cert.py --ip <局域网IP>`。`front_py.py` 默认校验 `certs/cert.pem`，对不上加 `--no-verify` 跳过。
 
 ## 常见问题
 
@@ -120,3 +122,4 @@ python dev\demo_attendance.py    :: q退出
 - 断外网可用（端侧与后端局域网连通即可）。
 - 浏览器取摄像头要求安全上下文（localhost 或 HTTPS）：局域网使用 HTTPS 部署；纯本地无网场景使用 `start.bat` 本地流程。
 - demo 提示导包失败：以项目根为工作目录运行（`python dev\demo_*.py`）。
+- 局域网打不开页面 / 证书 IP 不对：跑 `setup.bat` 时挂着 VPN，证书签到了虚拟网卡 IP。解决：关 VPN 后删掉 `certs\key.pem` + `certs\cert.pem`，重跑 `setup.bat`；或不断网直接 `python tools/gen_cert.py --ip <真实局域网IP>` 重签。
