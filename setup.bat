@@ -109,12 +109,40 @@ echo.
 
 rem ============ 4. 检查 ============
 echo [4/4] 检查 ...
-if not exist "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_internal.wasm" echo [警告] 缺少 Front\vendor wasm, 浏览器手势/检测不可用。
-if not exist "%ROOT%\Front\vendor\hand_landmarker.task" echo [警告] 缺少 Front\vendor\hand_landmarker.task, 浏览器手势不可用。
+if not exist "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_internal.wasm" (
+    
+    mkdir "%ROOT%\Front\vendor\tasks-vision\wasm" 2>nul
+    
+    curl -L --fail --retry 3 --connect-timeout 30 -o "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_internal.wasm" "https://storage.googleapis.com/mediapipe-assets/wasm/vision_wasm_internal.wasm"
+    if errorlevel 1 (
+        echo [错误] vision_wasm_internal.wasm 下载失败。
+          echo         请检查网络连接，或手动从以下地址下载后放入:
+          echo         "%ROOT%\Front\vendor\tasks-vision\wasm\"
+          echo         下载地址: https://storage.googleapis.com/mediapipe-assets/wasm/vision_wasm_internal.wasm
+    )
+  if not exist "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_internal.wasm" (
+    echo [警告] 缺少 Front\vendor wasm, 浏览器手势/检测不可用。
+  )
+)
+if not exist "%ROOT%\Front\vendor\hand_landmarker.task" (
+
+    mkdir "%ROOT%\Front\vendor" 2>nul
+
+    curl -L --fail --retry 3 --connect-timeout 30 -o "%ROOT%\Front\vendor\hand_landmarker.task" "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
+        if errorlevel 1 (
+            echo [错误] hand_landmarker.task 下载失败。
+            echo         请检查网络连接，或手动从以下地址下载后放入:
+            echo         "%ROOT%\Front\vendor"
+            echo         下载地址: https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
+        )
+
+  if not exist "%ROOT%\Front\vendor\hand_landmarker.task" (
+    echo [警告] 缺少 Front\vendor\hand_landmarker.task, 浏览器手势不可用。
+  )
+)
 if not exist "%ROOT%\Data\FaceEmbedding" (
-  mkdir -p "%ROOT%\Data\FaceEmbedding"
-  rem  linux 下 mkdir -p 正常递归创建;windows cmd 下 -p 会忽略并默认递归创建;windows powershell 下 -p 相当于 -Path ,隐式递归创建;所以不做 errorlevel 检查
-  
+  mkdir "%ROOT%\Data\FaceEmbedding" 2>nul
+
   if not exist "%ROOT%\Data\FaceEmbedding" echo [警告] Data\FaceEmbedding ^(人脸底库^) 创建失败, 录入功能不可用。
 )
 echo.
