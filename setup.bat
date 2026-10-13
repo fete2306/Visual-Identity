@@ -111,7 +111,11 @@ rem ============ 4. 检查 ============
 echo [4/4] 检查 ...
 if not exist "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_internal.wasm" echo [警告] 缺少 Front\vendor wasm, 浏览器手势/检测不可用。
 if not exist "%ROOT%\Front\vendor\hand_landmarker.task" echo [警告] 缺少 Front\vendor\hand_landmarker.task, 浏览器手势不可用。
-if not exist "%ROOT%\Data\FaceEmbedding" echo [警告] 缺少 Data\FaceEmbedding (人脸底库), 录入功能不可用。
+if not exist "%ROOT%\Data\FaceEmbedding" (
+  mkdir "%ROOT%\Data\FaceEmbedding"
+  
+  if not exist "%ROOT%\Data\FaceEmbedding" echo [警告] Data\FaceEmbedding ^(人脸底库^) 创建失败, 录入功能不可用。
+)
 echo.
 echo [完成] 配置就绪, 运行 start.bat 选择模式启动。
 pause
@@ -216,12 +220,12 @@ call :get_ip
 rem ---- 首选 Python 方式 (tools/gen_cert.py, 不依赖 openssl, 最稳; 依赖见 requirements.txt, 此处不装包) ----
 "%PYTHON%" -c "import cryptography" >nul 2>nul
 if errorlevel 1 (
-  echo [提示] 缺少 cryptography (requirements.txt 未装全), 改用 openssl 方式 ...
+  echo [提示] 缺少 cryptography ^(requirements.txt 未装全^), 改用 openssl 方式 ...
   goto :cert_openssl
 )
 "%PYTHON%" "%ROOT%\tools\gen_cert.py" --out-dir "%ROOT%\certs" --ip "%LOCAL_IP%"
 if not errorlevel 1 if exist "%ROOT%\certs\key.pem" if exist "%ROOT%\certs\cert.pem" (
-  echo [证书] 已签发 (Python, SAN 含 %LOCAL_IP%).
+  echo [证书] 已签发 ^(Python, SAN 含 %LOCAL_IP%^).
   exit /b 0
 )
 echo [提示] Python 签发失败, 改用 openssl 方式 ...
@@ -235,7 +239,7 @@ if errorlevel 1 (
 set "OPENSSL_CONF=NUL"
 openssl req -x509 -newkey rsa:2048 -keyout "%ROOT%\certs\key.pem" -out "%ROOT%\certs\cert.pem" -days 825 -nodes -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:%LOCAL_IP%"
 if not errorlevel 1 if exist "%ROOT%\certs\key.pem" if exist "%ROOT%\certs\cert.pem" (
-  echo [证书] 已签发 (openssl, SAN 含 %LOCAL_IP%).
+  echo [证书] 已签发 ^(openssl, SAN 含 %LOCAL_IP%^).
   exit /b 0
 )
 echo [错误] 证书签发失败, 请手动放置 certs\key.pem + cert.pem 后重试。
