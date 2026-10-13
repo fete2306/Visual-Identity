@@ -50,7 +50,7 @@ exit /b 1
 
 :local
 if not exist "%ROOT%\base1.py" (
-  echo [提示] 本地流程需要 base1.py (本地文件, 不在仓库中)。
+  echo [提示] 本地流程需要 base1.py ^(本地文件, 不在仓库中^)。
   pause
   exit /b 1
 )
