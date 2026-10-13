@@ -95,8 +95,45 @@ if not "%MODEL_RC%"=="0" (
   pause
   exit /b 1
 )
+
+if not exist "%ROOT%\Data\FaceEmbedding" mkdir "%ROOT%\Data\FaceEmbedding" 2>nul
+
+if not exist "%ROOT%\Front\vendor" mkdir "%ROOT%\Front\vendor" 2>nul
+if not exist "%ROOT%\Front\vendor\tasks-vision" mkdir "%ROOT%\Front\vendor\tasks-vision" 2>nul
+if not exist "%ROOT%\Front\vendor\tasks-vision\wasm" mkdir "%ROOT%\Front\vendor\tasks-vision\wasm" 2>nul
+
+rem ---- 1. vision_bundle.mjs ----
+if not exist "%ROOT%\Front\vendor\tasks-vision\vision_bundle.mjs" (
+    echo [下载] vision_bundle.mjs ...
+    curl -L --fail --retry 3 -o "%ROOT%\Front\vendor\tasks-vision\vision_bundle.mjs" "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs"
+) else ( echo [跳过] vision_bundle.mjs 已存在 )
+
+rem ---- 2. vision_wasm_internal.js ----
+if not exist "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_internal.js" (
+    echo [下载] vision_wasm_internal.js ...
+    curl -L --fail --retry 3 -o "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_internal.js" "https://storage.googleapis.com/mediapipe-assets/wasm/vision_wasm_internal.js"
+) else ( echo [跳过] vision_wasm_internal.js 已存在 )
+
+rem ---- 3. blaze_face_short_range.tflite ----
+if not exist "%ROOT%\Front\vendor\blaze_face_short_range.tflite" (
+    echo [下载] blaze_face_short_range.tflite ...
+    curl -L --fail --retry 3 -o "%ROOT%\Front\vendor\blaze_face_short_range.tflite" "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite"
+) else ( echo [跳过] blaze_face_short_range.tflite 已存在 )
+
+rem ---- 4. 非 SIMD 降级文件（可选） ----
+if not exist "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_nosimd_internal.js" (
+    echo [下载] vision_wasm_nosimd_internal.js ...
+    curl -L --fail --retry 3 -o "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_nosimd_internal.js" "https://storage.googleapis.com/mediapipe-assets/wasm/vision_wasm_nosimd_internal.js"
+) else ( echo [跳过] vision_wasm_nosimd_internal.js 已存在 )
+
+if not exist "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_nosimd_internal.wasm" (
+    echo [下载] vision_wasm_nosimd_internal.wasm ...
+    curl -L --fail --retry 3 -o "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_nosimd_internal.wasm" "https://storage.googleapis.com/mediapipe-assets/wasm/vision_wasm_nosimd_internal.wasm"
+) else ( echo [跳过] vision_wasm_nosimd_internal.wasm 已存在 )
+
 echo [2/4] 依赖与模型均就绪。
 echo.
+
 
 rem ============ 3. 自签证书 ============
 echo [3/4] 检查自签证书 ...
@@ -109,42 +146,17 @@ echo.
 
 rem ============ 4. 检查 ============
 echo [4/4] 检查 ...
+
 if not exist "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_internal.wasm" (
-    
-    mkdir "%ROOT%\Front\vendor\tasks-vision\wasm" 2>nul
-    
-    curl -L --fail --retry 3 --connect-timeout 30 -o "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_internal.wasm" "https://storage.googleapis.com/mediapipe-assets/wasm/vision_wasm_internal.wasm"
-    if errorlevel 1 (
-        echo [错误] vision_wasm_internal.wasm 下载失败。
-          echo         请检查网络连接，或手动从以下地址下载后放入:
-          echo         "%ROOT%\Front\vendor\tasks-vision\wasm\"
-          echo         下载地址: https://storage.googleapis.com/mediapipe-assets/wasm/vision_wasm_internal.wasm
-    )
-  if not exist "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_internal.wasm" (
-    echo [警告] 缺少 Front\vendor wasm, 浏览器手势/检测不可用。
-  )
+  echo [警告] 缺少 Front\vendor wasm, 浏览器手势/检测不可用。
 )
+
 if not exist "%ROOT%\Front\vendor\hand_landmarker.task" (
-
-    mkdir "%ROOT%\Front\vendor" 2>nul
-
-    curl -L --fail --retry 3 --connect-timeout 30 -o "%ROOT%\Front\vendor\hand_landmarker.task" "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
-        if errorlevel 1 (
-            echo [错误] hand_landmarker.task 下载失败。
-            echo         请检查网络连接，或手动从以下地址下载后放入:
-            echo         "%ROOT%\Front\vendor"
-            echo         下载地址: https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
-        )
-
-  if not exist "%ROOT%\Front\vendor\hand_landmarker.task" (
-    echo [警告] 缺少 Front\vendor\hand_landmarker.task, 浏览器手势不可用。
-  )
+  echo [警告] 缺少 Front\vendor\hand_landmarker.task, 浏览器手势不可用。
 )
-if not exist "%ROOT%\Data\FaceEmbedding" (
-  mkdir "%ROOT%\Data\FaceEmbedding" 2>nul
 
-  if not exist "%ROOT%\Data\FaceEmbedding" echo [警告] Data\FaceEmbedding ^(人脸底库^) 创建失败, 录入功能不可用。
-)
+if not exist "%ROOT%\Data\FaceEmbedding" echo [警告] Data\FaceEmbedding (人脸底库) 创建失败, 录入功能不可用。
+
 echo.
 echo [完成] 配置就绪, 运行 start.bat 选择模式启动。
 pause
