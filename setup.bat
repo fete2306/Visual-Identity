@@ -112,7 +112,8 @@ echo [4/4] 检查 ...
 if not exist "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_internal.wasm" echo [警告] 缺少 Front\vendor wasm, 浏览器手势/检测不可用。
 if not exist "%ROOT%\Front\vendor\hand_landmarker.task" echo [警告] 缺少 Front\vendor\hand_landmarker.task, 浏览器手势不可用。
 if not exist "%ROOT%\Data\FaceEmbedding" (
-  mkdir "%ROOT%\Data\FaceEmbedding"
+  mkdir -p "%ROOT%\Data\FaceEmbedding"
+  rem  linux 下 mkdir -p 正常递归创建;windows cmd 下 -p 会忽略并默认递归创建;windows powershell 下 -p 相当于 -Path ,隐式递归创建;所以不做 errorlevel 检查
   
   if not exist "%ROOT%\Data\FaceEmbedding" echo [警告] Data\FaceEmbedding ^(人脸底库^) 创建失败, 录入功能不可用。
 )
