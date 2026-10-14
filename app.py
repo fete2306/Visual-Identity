@@ -32,6 +32,7 @@ from starlette.concurrency import run_in_threadpool
 
 import time
 import json
+import atexit
 
 
 FaceBlob = NDArray[np.float32]       # (N,3,112,112) 输入
@@ -40,6 +41,7 @@ FaceImage = NDArray[np.uint8]        # (H,W,3) BGR原图
 
 checker=FaceRecognition()
 recognitionCount=20
+atexit.register(checker.save)
 
 app = FastAPI()
 
@@ -142,6 +144,48 @@ async def infer(img: UploadFile = File(...), min_sim=0.4):
     return results
 
 @app.post("/infer/save")
-async def infer_save(img: UploadFile = File(...), name:str=""):
-    emb=checker.getFaceTensor(img)
-    checker.add(name,emb=emb)
+async def infer_save(img: UploadFile = File(...), name: str = ""):
+    """载入人脸: 对标 Back.FaceCheckWithMediapipe.solve() 按 's' 存脸流程.
+
+    Back 流程: 输入name -> 选第几张脸 crop -> getFaceTensor -> add(name, emb) -> 退出时 save().
+    这里前端已裁好单人脸 crop, 后端只做 解码->getFaceTensor->add, 内存即时生效 (后续 match 可见),
+    磁盘经 atexit.save 兜底 + 本次主动 save 一次 (低频, 失败不影响本次返回).
+
+    调用: POST /infer/save?name=xxx  multipart {img: jpeg}
+    返回: {"ok": True, "name": xxx, "total": 库总量, "time": 秒}
+    """
+    t0 = time.time()
+    try:
+        name = (name or "").strip()
+        if not name:
+            return JSONResponse({"ok": False, "error": "name 为空"}, status_code=400)
+        raw = await img.read()
+        arr = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
+        if arr is None:
+            return JSONResponse({"ok": False, "error": "图片解码失败"}, status_code=400)
+        try:
+            emb = await run_in_threadpool(checker.getFaceTensor, arr)  # ONNX阻塞, 扔线程池 (同 /infer/batch)
+            checker.add(name, emb=emb)
+        finally:
+            try:
+                del arr
+            except Exception:
+                pass
+        save_warning = None
+        try:
+            checker.save()  # 主动落盘一次, 崩溃也不丢本次录入; 正常退出时 atexit 再存
+        except Exception as e:
+            save_warning = str(e)
+        out = {"ok": True, "name": name, "total": len(checker.ids), "time": time.time() - t0}
+        if save_warning:
+            out["save_warning"] = save_warning
+        return out
+    finally:
+        try:
+            await img.close()
+        except Exception:
+            try:
+                if not img.file.closed:
+                    img.file.close()
+            except Exception:
+                pass

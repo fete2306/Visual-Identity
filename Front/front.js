@@ -8,10 +8,11 @@
  *     Node>=18 自带 fetch/FormData/Blob,无需额外依赖。
  *     自签 https 下 Node CLI 需加环境变量 NODE_TLS_REJECT_UNAUTHORIZED=0 (仅开发机, 浏览器走点击信任)。
  *
- * 后端接口 (app.py /infer/batch, 原样引用): POST {server}/infer/batch?min_sim=0.4
+ * 后端接口 (app.py /infer/batch + /infer/save, 原样引用): POST {server}/infer/batch?min_sim=0.4
  *   multipart, 字段 {index: img}: 第 i 张人脸以字段名 String(i) 发送, 顺序即索引.
  *   返回: {"time": float, "results": {"0": [name, sim], "1": [...]}} (k 由发送方已知, 无 count)
  *   解析另兼容旧版单体 results=[name, sim].
+ * 录入: POST {server}/infer/save?name=xxx  multipart {img: blob} (inferSave/onSave, 对标 Back.solve 按 's').
  *
  * 可视化(浏览器): overlay 画布叠加在 video 上 —
  *   绿色框=MediaPipe BlazeFace 本地人脸框(./vendor/, 全浏览器通用;
@@ -22,17 +23,48 @@
  *   (D:\conda\envs\cuda128\python.exe -m http.server 8080, 再访问 http://127.0.0.1:8080/Front/front.html)。
  */
 (function (global) {
-  // Node 下用 Object.values(os.networkInterfaces()) 取首个非内网IPv4做默认后端;
+  // Node 下从 os.networkInterfaces() 收集全部IPv4 后过滤+优选, 做默认后端;
   // 浏览器下没有 require/os, 返回 null, 由 location.origin(同源) 或 127.0.0.1 兜底.
+  // 过滤与 tools/get_lan_ip.py 同规则: 排除回环/链路本地/Clash TUN 虚拟网段
+  // (开了 Clash TUN 时首个非内网 IP 常是 198.18.0.1, 局域网设备连不上).
+  function lanUsable(ip) {
+    if (!ip) return false;
+    for (const p of ["127.", "169.254.", "198.18.", "198.19.", "0."]) {
+      if (ip.indexOf(p) === 0) return false;
+    }
+    const parts = ip.split(".");
+    if (parts.length !== 4) return false;
+    const nums = parts.map(Number);
+    if (nums.some((n) => !(n >= 0 && n <= 255))) return false;
+    if (nums[0] >= 224) return false;
+    return true;
+  }
+  function lanRank(ip) {
+    if (ip.indexOf("192.168.") === 0) return 3;
+    if (ip.indexOf("10.") === 0) return 2;
+    if (ip.indexOf("172.") === 0) {
+      const second = Number(ip.split(".")[1]);
+      if (second >= 16 && second <= 31) return 2;
+    }
+    return 1;
+  }
   function getLocalIp() {
     try {
       if (typeof require === "undefined") return null;
       const os = require("os");
-      for (const nets of Object.values(os.networkInterfaces())) {
-        for (const net of nets || []) {
-          if (net.family === "IPv4" && !net.internal) return net.address;
+      const VNIC = ["vmware", "vmnet", "virtualbox", "vbox", "hyper-v", "vethernet", "wsl", "loopback", "sandbox"];
+      const ifs = os.networkInterfaces();
+      const cands = [];
+      for (const name of Object.keys(ifs)) {
+        if (VNIC.some((k) => name.toLowerCase().indexOf(k) >= 0)) continue; // VMware/WSL 等虚拟网卡跳过
+        for (const net of ifs[name] || []) {
+          if (net.family === "IPv4" && !net.internal && net.address) cands.push(net.address);
         }
       }
+      const usable = [...new Set(cands)].filter(lanUsable);
+      if (!usable.length) return null;
+      usable.sort((a, b) => lanRank(b) - lanRank(a));
+      return usable[0];
     } catch (_) {}
     return null;
   }
@@ -51,7 +83,7 @@
   const INFER_PATH = "/infer/batch";
   function normalizeServer(server) {
     server = String(server || "").trim().split("?")[0].replace(/\/+$/, "");
-    for (const suffix of ["/infer/batch", "/infer/single", "/infer"]) {
+    for (const suffix of ["/infer/batch", "/infer/single", "/infer/save", "/infer"]) {
       if (server.toLowerCase().endsWith(suffix)) {
         server = server.slice(0, -suffix.length).replace(/\/+$/, "");
         break;
@@ -127,6 +159,37 @@
     const r = await inferBatch([blob], server, minSim);
     const one = r.list[0] || { name: "unknow", sim: 0 };
     return { name: one.name, sim: one.sim, serverTime: r.serverTime, rttMs: r.rttMs };
+  }
+
+  // 载入人脸: 对标 Back.solve 按 's' 存脸 (输入name + 选第几张脸 -> add(name, emb)).
+  // 后端 app.py /infer/save: POST {server}/infer/save?name=xxx  multipart {img: blob}
+  // (字段名必须叫 img, 对标后端 img: UploadFile = File(...); name 走 query, 与后端签名一致).
+  // 返回 {ok, name, total} (total=库总量).
+  const SAVE_PATH = "/infer/save";
+  async function inferSave(blob, name, server = DEFAULTS.server) {
+    server = normalizeServer(server);
+    name = String(name || "").trim();
+    if (!name) throw new Error("姓名为空, 请先填写姓名");
+    if (!blob) throw new Error("没有图像数据, 请先打开摄像头或选择图片");
+    const url = server + SAVE_PATH + "?name=" + encodeURIComponent(name);
+    const fd = new FormData();
+    fd.append("img", blob, "face.jpg");
+    const t0 = performance.now();
+    let resp;
+    try {
+      resp = await fetch(url, { method: "POST", body: fd });
+    } catch (e) {
+      throw new Error(`连不上后端 ${url} (${e.message})。请检查后端是否已启动且端口未被占用`);
+    }
+    const rtt = performance.now() - t0;
+    if (!resp.ok) {
+      let txt = "";
+      try { txt = await resp.text(); } catch (_) {}
+      throw new Error("HTTP " + resp.status + ": " + String(txt).slice(0, 200));
+    }
+    const data = await resp.json();
+    if (data.ok === false) throw new Error(data.error || "后端拒绝保存");
+    return { name: data.name || name, total: Number(data.total || 0), serverTime: Number(data.time || 0), rttMs: rtt, saveWarning: data.save_warning || null };
   }
 
   // ---- 浏览器: 摄像头循环推理 (对标 Back.solve 的跳帧+节流思想) ----
@@ -664,6 +727,7 @@
     }
     state.stream = stream;
     state.deviceId = opts.deviceId || "";
+    clearSavePreview(); // 换路重开后旧预览编号失效 (理由: 脸的位置全变, 必须重新预览编号)
     const cv = document.getElementById("canvas");
     if (cv) cv.style.display = "none"; // 切回摄像头时收起静态图
     video.srcObject = stream;
@@ -680,6 +744,7 @@
   }
 
   function stopCamera() {
+    clearSavePreview();
     if (state.timer) clearInterval(state.timer);
     state.timer = null;
     stopOverlay();
@@ -811,6 +876,143 @@
     }
   }
 
+  // 录入快照缓存: previewSave 把本帧全部人脸裁出并编号显示 (对标 Back.solve 按 's'
+  // 后把 FaceImg0..k-1 逐个 imshow), onSave 按编号取对应项 POST.
+  // 编号顺序 = 本帧检测顺序, 与 captureAndInfer 批量发送顺序一致 (即识别结果 #i 的顺序).
+  const saveCache = { blobs: [], urls: [], ts: 0 };
+
+  function clearSavePreview() {
+    for (const u of saveCache.urls) { try { URL.revokeObjectURL(u); } catch (_) {} }
+    saveCache.blobs = []; saveCache.urls = []; saveCache.ts = 0;
+    if (typeof document !== "undefined") {
+      const box = document.getElementById("savePreview");
+      if (box) box.innerHTML = "";
+    }
+  }
+
+  function markSaveSelection() {
+    if (typeof document === "undefined") return;
+    const box = document.getElementById("savePreview");
+    const idxEl = document.getElementById("saveIdx");
+    if (!box || !idxEl) return;
+    let idx = parseInt(idxEl.value || "0", 10);
+    if (!Number.isFinite(idx)) idx = 0;
+    for (const el of box.children) {
+      el.style.outline = (Number(el.dataset.idx) === idx) ? "3px solid #16a34a" : "1px solid #ccc";
+    }
+  }
+
+  // 截取本帧全部人脸并编号显示 (对标 Back.solve: 弹窗 FaceImg0..k-1).
+  // 网页无弹窗, 用 #savePreview 缩略图逐张编号, 点某张即选中该编号.
+  async function previewSave() {
+    const o = currentOpts();
+    const video = typeof document !== "undefined" && document.getElementById("video");
+    if (!video || !state.stream || video.readyState < 2 || !video.videoWidth) {
+      log("预览需要先打开摄像头 (文件模式请保证单人照, 直接点录入送整图)");
+      return [];
+    }
+    const w = video.videoWidth, h = video.videoHeight;
+    const full = document.createElement("canvas");
+    full.width = w; full.height = h;
+    full.getContext("2d").drawImage(video, 0, 0, w, h);
+    // 与 captureAndInfer 同一数据源同一顺序 (新鲜检测框, 检测顺序即批量下标顺序)
+    const faces = (overlay.facesTs && performance.now() - overlay.facesTs < 1500)
+      ? overlay.faces.slice() : [];
+    if (!faces.length) { log("预览: 当前未检出人脸, 请对准摄像头"); return []; }
+    clearSavePreview();
+    const pad = 20;
+    for (let i = 0; i < faces.length; i++) {
+      const f = faces[i];
+      const x = Math.max(0, Math.round(f.x - pad)), y = Math.max(0, Math.round(f.y - pad));
+      const cw = Math.max(1, Math.min(w - x, Math.round(f.w + pad * 2)));
+      const ch = Math.max(1, Math.min(h - y, Math.round(f.h + pad * 2)));
+      const crop = document.createElement("canvas");
+      crop.width = cw; crop.height = ch;
+      crop.getContext("2d").drawImage(full, x, y, cw, ch, 0, 0, cw, ch);
+      const blob = await new Promise((res) => crop.toBlob(res, "image/jpeg", o.jpegQuality));
+      if (blob) {
+        saveCache.blobs.push(blob);
+        saveCache.urls.push(URL.createObjectURL(blob));
+      } else {
+        saveCache.blobs.push(null);
+        saveCache.urls.push("");
+      }
+    }
+    saveCache.ts = performance.now();
+    if (typeof document !== "undefined") {
+      const box = document.getElementById("savePreview");
+      if (box) {
+        box.innerHTML = "";
+        saveCache.urls.forEach((u, i) => {
+          const wrap = document.createElement("span");
+          wrap.dataset.idx = String(i);
+          wrap.style.cssText = "display:inline-block;text-align:center;margin:2px;cursor:pointer;outline:1px solid #ccc";
+          wrap.title = "点此选中第 " + i + " 张";
+          const img = document.createElement("img");
+          img.src = u; img.alt = "face" + i;
+          img.style.cssText = "width:96px;height:96px;object-fit:cover;display:block;background:#111";
+          const tag = document.createElement("b");
+          tag.textContent = "#" + i;
+          wrap.appendChild(img); wrap.appendChild(tag);
+          wrap.onclick = () => {
+            document.getElementById("saveIdx").value = String(i);
+            markSaveSelection();
+          };
+          box.appendChild(wrap);
+        });
+        markSaveSelection();
+        const idxEl = document.getElementById("saveIdx");
+        if (idxEl) idxEl.oninput = markSaveSelection;
+      }
+    }
+    log(`预览: 本帧 ${saveCache.blobs.length} 张脸已编号 #0..#${saveCache.blobs.length - 1} (与识别 #i 同顺序), 点某张选中, 确认姓名后点录入`);
+    return saveCache.blobs;
+  }
+
+  // 录入选中的人脸 -> /infer/save (对标 Back.solve 按 's' 确认 y 后按编号存入).
+  // 摄像头: 用预览缓存中对应编号的裁图 (无新鲜预览则先自动预览一次, 第二次点击才真正发送;
+  //   理由: 两步确认, 与 Back.solve 的 n/y 确认对应, 避免序号盲填张冠李戴).
+  // 没开摄像头: 直接送文件原图 (适合单人证件照).
+  async function onSave() {
+    const o = currentOpts();
+    const name = (typeof document !== "undefined" && document.getElementById("saveName")?.value || "").trim();
+    let idx = parseInt(typeof document !== "undefined" && document.getElementById("saveIdx")?.value || "0", 10);
+    if (!Number.isFinite(idx) || idx < 0) idx = 0;
+    if (!name) { log("请先填写姓名再点录入"); return; }
+    const video = typeof document !== "undefined" && document.getElementById("video");
+    let blob = null, desc = "";
+    if (video && state.stream && video.readyState >= 2 && video.videoWidth) {
+      const fresh = saveCache.blobs.length && performance.now() - saveCache.ts < 15000;
+      if (!fresh) {
+        await previewSave();
+        if (!saveCache.blobs.length) return;
+        log("已生成编号预览, 请点某张脸确认编号 (或改序号框), 确认无误后再点一次录入");
+        return;
+      }
+      if (idx >= saveCache.blobs.length) { log(`序号越界 0..${saveCache.blobs.length - 1}, 请点预览图重选`); return; }
+      blob = saveCache.blobs[idx];
+      desc = `预览第${idx}张脸(共${saveCache.blobs.length}张)`;
+    } else {
+      const f = typeof document !== "undefined" && document.getElementById("file")?.files?.[0];
+      if (!f) { log("请先打开摄像头或选择图片再录入"); return; }
+      blob = f;
+      desc = `文件 ${f.name} 整图`;
+      log("提示: 文件模式送整图录入, 适合单人照; 合照多脸请开摄像头预览编号后录");
+    }
+    if (!blob) { log("裁图失败, 请重试"); return; }
+    log(`正在录入 ${desc} 为 "${name}" ...`);
+    try {
+      const r = await inferSave(blob, name, o.server);
+      log(`录入成功: "${r.name}" (库总量=${r.total}` +
+        (r.serverTime ? ` server=${(r.serverTime * 1000).toFixed(0)}ms` : "") +
+        ` rtt=${r.rttMs.toFixed(0)}ms)` +
+        (r.saveWarning ? ` [落盘警告: ${r.saveWarning}]` : ""));
+      showResult([{ name: r.name, sim: 1 }], r.serverTime, r.rttMs);
+    } catch (e) {
+      log("录入失败: " + e.message);
+    }
+  }
+
   async function onSingle() {
     const o = currentOpts();
     const video = document.getElementById("video");
@@ -823,7 +1025,7 @@
     await captureAndInfer(video, null, o);
   }
 
-  const FrontJS = { inferBlob, inferBatch, testConnection, normalizeServer, getLocalIp, startCamera, stopCamera, captureAndInfer, startOverlay, stopOverlay, processImageFile, onStart, onTest, onSingle, listCameras, refreshCameraList, onRefreshCameras, onCameraChange, DEFAULTS };
+  const FrontJS = { inferBlob, inferBatch, inferSave, testConnection, normalizeServer, getLocalIp, startCamera, stopCamera, captureAndInfer, startOverlay, stopOverlay, processImageFile, onStart, onTest, onSingle, onSave, previewSave, listCameras, refreshCameraList, onRefreshCameras, onCameraChange, DEFAULTS };
   global.FrontJS = FrontJS;
 
   // 页面加载即枚举一次 (无权限时 label 为空先显示编号, 授权/开流后会再刷真名)

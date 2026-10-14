@@ -79,18 +79,59 @@ def normalize_server(server: str) -> str:
     """输入框可能粘了 .../infer/batch 等完整地址甚至带 ?min_sim, 统一归一化成裸 host."""
     # 去后缀必须长串优先 (先 batch/single 再 infer), 否则 ".../infer/batch" 会剩 "/batch".
     s = (server or "").strip().split("?")[0].rstrip("/")
-    for suffix in ("/infer/batch", "/infer/single", "/infer"):
+    for suffix in ("/infer/batch", "/infer/single", "/infer/save", "/infer"):
         if s.lower().endswith(suffix):
             s = s[: -len(suffix)].rstrip("/")
             break
     return s or "https://127.0.0.1:8060"
 
 
+# 与 tools/get_lan_ip.py 同规则: 排除回环/链路本地/Clash TUN 虚拟网段, 点名排除
+# VMware/WSL 等虚拟网卡(也占 192.168.x 但手机连不上), 优选 RFC1918.
+# (开了 Clash TUN 时默认出口是 198.18.0.1 这类虚拟 IP, 不能取首个就返回)
+_LAN_EXCLUDED = ("127.", "169.254.", "198.18.", "198.19.", "0.")
+_LAN_VIRTUAL_NAMES = ("vmware", "vmnet", "virtualbox", "vbox", "hyper-v",
+                      "vethernet", "wsl", "loopback", "sandbox")
+
+
+def _lan_usable(ip: str) -> bool:
+    if not ip or ip.startswith(_LAN_EXCLUDED):
+        return False
+    parts = ip.split(".")
+    if len(parts) != 4:
+        return False
+    try:
+        nums = [int(p) for p in parts]
+    except ValueError:
+        return False
+    if any(n < 0 or n > 255 for n in nums) or nums[0] >= 224:
+        return False
+    return True
+
+
+def _lan_rank(ip: str) -> int:
+    if ip.startswith("192.168."):
+        return 3
+    if ip.startswith("10."):
+        return 2
+    if ip.startswith("172."):
+        try:
+            if 16 <= int(ip.split(".")[1]) <= 31:
+                return 2
+        except ValueError:
+            pass
+    return 1
+
+
 def get_lan_ip() -> str:
-    """首选 psutil.net_if_addrs().values() 取首个非回环IPv4, 失败回退 socket."""
+    """收集全部 IPv4 后过滤+优选, 失败回退 127.0.0.1 (宁可回环, 不返回连不上的虚拟 IP)."""
+    cands = []
+    default_ip = ""
     try:
         import psutil
-        for addrs in psutil.net_if_addrs().values():
+        for nic, addrs in psutil.net_if_addrs().items():
+            if any(k in (nic or "").lower() for k in _LAN_VIRTUAL_NAMES):
+                continue
             for a in addrs or []:
                 fam = getattr(a.family, "value", a.family)
                 try:
@@ -100,20 +141,26 @@ def get_lan_ip() -> str:
                     is_v4 = (fam == 2)
                 if not is_v4:
                     continue
-                ip = a.address or ""
-                if ip and not ip.startswith("127.") and not ip.startswith("169.254."):
-                    return ip
+                if a.address:
+                    cands.append(a.address)
     except Exception:
         pass
     try:
         import socket
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
+        try:
+            s.connect(("8.8.8.8", 80))
+            default_ip = s.getsockname()[0]
+            cands.append(default_ip)
+        finally:
+            s.close()
     except Exception:
+        pass
+    usable = [c for c in dict.fromkeys(cands) if _lan_usable(c)]
+    if not usable:
         return "127.0.0.1"
+    # 默认出口加权: 同段多网卡(如 VMware/Hyper-V 虚拟网卡也占 192.168.x)时选真正上网那块
+    return max(usable, key=lambda c: _lan_rank(c) + (10 if c == default_ip else 0))
 
 
 def list_cameras(max_index: int = 8):
@@ -259,6 +306,44 @@ def infer_remote(img_bgr: np.ndarray, server: str, min_sim: float = 0.4,
     return name, sim, srv_t, rtt
 
 
+def infer_save_remote(crop_bgr: np.ndarray, name: str, server: str,
+                      timeout: float = 10.0, no_verify: bool = False) -> bool:
+    """载入人脸: 对标 Back.FaceCheckWithMediapipe.solve() 按 's' 存脸流程.
+
+    Back 流程: 输入name -> 选第几张脸 crop -> getFaceTensor -> add(name, emb).
+    这里 crop 已在本地裁好, 只需 POST 到后端 app.py /infer/save?name=xxx (multipart {img}).
+    返回 True=后端已 add(+落盘), False=失败.
+    """
+    name = (name or "").strip()
+    if not name:
+        print("[save] 姓名为空, 请先输入姓名")
+        return False
+    b = _encode_jpg(crop_bgr)
+    if b is None:
+        print("[save] JPEG 编码失败")
+        return False
+    url = normalize_server(server) + "/infer/save"
+    try:
+        r = requests.post(
+            url,
+            files={"img": ("face.jpg", b, "image/jpeg")},  # 字段名必须叫 img (对标后端 img: UploadFile)
+            params={"name": name},
+            timeout=timeout,
+            verify=_verify_arg(no_verify),
+        )
+        r.raise_for_status()
+        data = r.json()
+        if data.get("ok"):
+            warn = f" [落盘警告: {data.get('save_warning')}]" if data.get("save_warning") else ""
+            print(f"[save] 已录入 \"{data.get('name', name)}\" (库总量={data.get('total', '?')}){warn}")
+            return True
+        print(f"[save] 后端拒绝: {data.get('error', data)}")
+        return False
+    except Exception as e:
+        print(f"[save] 请求失败: {e}")
+        return False
+
+
 def infer_image_file(image_path: str, server: str, min_sim: float = 0.4,
                      no_verify: bool = False):
     img = cv2.imread(image_path)
@@ -299,7 +384,7 @@ def run_camera(args):
     except Exception:
         pass
 
-    print("按 q 退出 | bboxes 本地 detect, 身份远端 /infer/batch")
+    print("按 q 退出, 按 s 录入当前人脸(-> POST /infer/save) | bboxes 本地 detect, 身份远端 /infer/batch")
     frame_idx = 0
     bboxes = np.zeros((0, 5), dtype=np.float32)
     face_results = []  # [{bbox, det_score, name, sim}]
@@ -424,9 +509,90 @@ def run_camera(args):
             print(f"[t] fps={fps:.1f} det={t_det:.0f}ms infer={t_rec:.0f}ms "
                   f"hand={t_hand:.0f}ms faces={len(face_results)}")
 
-        cv2.imshow("Front/py - q to quit", frame)
-        if cv2.waitKey(1) & 0xFF == ord("q"):
+        # 录入用干净底 (理由: frame 此时已画上框/标签, 直接裁会把绿框缝进 embedding;
+        # 对标 Back.solve 按 's' 时从原帧裁对应 bbox)
+        try:
+            enroll_src = frame.copy()
+        except Exception:
+            enroll_src = frame
+
+        cv2.imshow("Front/py - q to quit, s to save face", frame)
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord("q"):
             break
+        elif key == ord("s"):
+            # ---- 载入人脸: 原样对标 Back.FaceCheckWithMediapipe.solve() 按 's' ----
+            # Back 流程: 输入name -> 把本帧全部人脸逐个裁出并弹窗编号显示
+            #   (FaceImg0..k-1, 与 face_results/bboxes 同顺序) -> 按 n 取消 / y 确认
+            #   -> 输入编号 -> getFaceTensor(faceList[idx]) -> add.
+            # 这里唯一差别: getFaceTensor+add 在后端, 故最后一步为 POST /infer/save.
+            if not face_results:
+                print("[save] 当前无脸, 请对准摄像头后再按 s")
+                continue
+            try:
+                person = input("name: ").strip().split()[0]
+            except (EOFError, KeyboardInterrupt, IndexError):
+                print("[save] 已取消")
+                continue
+            if not person:
+                print("[save] 姓名为空, 已取消")
+                continue
+            face_list = []
+            print("set n to quit FaceSave and set y to save")
+            for _idx, fr in enumerate(face_results):
+                x1i, y1i, x2i, y2i = fr["bbox"]
+                hh, ww = enroll_src.shape[:2]
+                x1i, y1i = max(0, x1i), max(0, y1i)
+                x2i, y2i = min(ww, x2i), min(hh, y2i)
+                if x2i <= x1i or y2i <= y1i:
+                    continue
+                face_img = enroll_src[y1i:y2i, x1i:x2i]
+                if face_img.size == 0:
+                    continue
+                face_list.append(face_img)
+                # 与 Back.solve 同款: 黑底 640x640 居中展示, 窗口标题即编号
+                try:
+                    tmp = np.zeros((640, 640, 3), dtype=np.uint8)
+                    fh, fw = face_img.shape[:2]
+                    y0, x0 = 320 - fh // 2, 320 - fw // 2
+                    tmp[y0:y0 + fh, x0:x0 + fw] = face_img
+                    cv2.imshow(f"FaceImg{len(face_list) - 1}", tmp)
+                except Exception:
+                    pass
+            if not face_list:
+                print("[save] 裁图全空, 已取消")
+                continue
+            ikey = cv2.waitKey(0) & 0xFF
+            if ikey == ord("n"):
+                for f_idx in range(len(face_list)):
+                    try:
+                        cv2.destroyWindow(f"FaceImg{f_idx}")
+                    except Exception:
+                        pass
+                continue
+            elif ikey == ord("y"):
+                try:
+                    sel_idx = int(input().split()[0])
+                except (EOFError, KeyboardInterrupt, IndexError, ValueError):
+                    print("[save] 序号非法, 已取消")
+                    for f_idx in range(len(face_list)):
+                        try:
+                            cv2.destroyWindow(f"FaceImg{f_idx}")
+                        except Exception:
+                            pass
+                    continue
+                if not (0 <= sel_idx < len(face_list)):
+                    print(f"[save] 序号越界 0..{len(face_list) - 1}, 已取消")
+                else:
+                    ok = infer_save_remote(face_list[sel_idx], person,
+                                           server, args.timeout, args.no_verify)
+                    if ok:
+                        print(f"[save] succes to save FaceImg{sel_idx} as {person}")
+                for f_idx in range(len(face_list)):
+                    try:
+                        cv2.destroyWindow(f"FaceImg{f_idx}")
+                    except Exception:
+                        pass
 
     cap.release()
     cv2.destroyAllWindows()

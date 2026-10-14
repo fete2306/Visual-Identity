@@ -77,7 +77,10 @@ set "LOCAL_IP="
 if exist "%ROOT%/tools/get_lan_ip.py" for /f "delims=" %%a in ('"%PYTHON%" "%ROOT%/tools/get_lan_ip.py" 2^>nul') do (
   if not defined LOCAL_IP set "LOCAL_IP=%%a"
 )
-if not defined LOCAL_IP for /f "tokens=2 delims=:" %%a in ('ipconfig 2^>nul ^| findstr "IPv4"') do (
+rem 脚本回环表示无可用内网(或被 Clash TUN 等虚拟网卡顶掉默认出口), 再用 ipconfig 兜底一次;
+rem 兜底同样过滤虚拟/链路本地网段 (198.18/198.19 系 Clash TUN, 169.254 系未获 DHCP)。
+if "%LOCAL_IP%"=="127.0.0.1" set "LOCAL_IP="
+if not defined LOCAL_IP for /f "tokens=2 delims=:" %%a in ('ipconfig 2^>nul ^| findstr "IPv4" ^| findstr /v "169.254 198.18 198.19 127.0.0.1"') do (
   if not defined LOCAL_IP set "LOCAL_IP=%%a"
 )
 set "LOCAL_IP=%LOCAL_IP: =%"
