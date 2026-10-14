@@ -1,6 +1,6 @@
 # Https 版后端: 接口与父目录 app.py 完全一致 (/infer/batch + /infer/single),
 # 另挂载 ./Front 实现 https 同源 (页面与接口同域: 无 mixed content, 无 CORS 烦恼).
-# base1/Model/Data/certs 均引用父目录, 不复制. 运行 (cwd 必须为 D:\Visual-Identity_r):
+# Back.py/Model/Data/certs 均引用父目录, 不复制. 运行 (cwd 必须为 D:\Visual-Identity_r):
 #   D:\conda\envs\cuda128\python.exe -m uvicorn Https.app:app --host 0.0.0.0 --port 8060 --ssl-keyfile certs\key.pem --ssl-certfile certs\cert.pem
 # 页面: https://192.168.178.142:8060/front/front.html (先开同域 /docs 点“继续前往”完成自签信任)
 import sys

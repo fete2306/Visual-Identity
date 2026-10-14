@@ -1,4 +1,4 @@
-"""手势鼠标 demo (独立, 调用 dev/base1.py 解耦后的手势方法).
+"""手势鼠标 demo (独立, 调用 Back.py 解耦后的手势方法).
 
 逻辑: 后端.detect_hands(BGR) -> 手势字典 -> 预留判断 -> 右手食指相对位移 -> 移动系统鼠标.
 鼠标移动使用 Windows ctypes, 无需安装 pyautogui.

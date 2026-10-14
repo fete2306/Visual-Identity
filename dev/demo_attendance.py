@@ -1,4 +1,4 @@
-"""签到 demo (独立, 调用 dev/base1.py 解耦后的人脸方法 + sqlite 写入).
+"""签到 demo (独立, 调用 Back.py 解耦后的人脸方法 + sqlite 写入).
 
 逻辑: 后端.detect_faces(BGR) -> 人脸框 -> 裁图 -> FaceRecognition 识别 -> attendance_db.try_sign_in()
 对应 FR-05 实时签到 (达阈值写入、当日去重、stranger 不记).

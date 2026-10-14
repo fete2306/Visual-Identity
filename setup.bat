@@ -102,33 +102,44 @@ if not exist "%ROOT%\Front\vendor" mkdir "%ROOT%\Front\vendor" 2>nul
 if not exist "%ROOT%\Front\vendor\tasks-vision" mkdir "%ROOT%\Front\vendor\tasks-vision" 2>nul
 if not exist "%ROOT%\Front\vendor\tasks-vision\wasm" mkdir "%ROOT%\Front\vendor\tasks-vision\wasm" 2>nul
 
-rem ---- 1. vision_bundle.mjs ----
+rem 前端 vendor 版本钉死 (须与 tools/download_models.py 内 _TASKS_VER 保持一致;
+rem  已用 jsdelivr API + 本地文件大小逐字节核对: vision_bundle.mjs=136870,
+rem  vision_wasm_internal.js=209826/wasm=9423986, nosimd js=209735/wasm=9294247, 均为 0.10.14)
+set "TASKS_VER=0.10.14"
+
+rem ---- 1. vision_bundle.mjs ---- (jsdelivr 钉版本, 原无版本号 URL 会漂到 latest)
 if not exist "%ROOT%\Front\vendor\tasks-vision\vision_bundle.mjs" (
-    echo [下载] vision_bundle.mjs ...
-    curl -L --fail --retry 3 -o "%ROOT%\Front\vendor\tasks-vision\vision_bundle.mjs" "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs"
+    echo [下载] vision_bundle.mjs ^(@%TASKS_VER%^) ...
+    curl -L --fail --retry 3 -o "%ROOT%\Front\vendor\tasks-vision\vision_bundle.mjs" "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@%TASKS_VER%/vision_bundle.mjs"
 ) else ( echo [跳过] vision_bundle.mjs 已存在 )
 
-rem ---- 2. vision_wasm_internal.js ----
+rem ---- 2. vision_wasm_internal.js ---- (原 storage.googleapis.com/mediapipe-assets 为浮动 latest, 改 jsdelivr 钉版本)
 if not exist "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_internal.js" (
-    echo [下载] vision_wasm_internal.js ...
-    curl -L --fail --retry 3 -o "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_internal.js" "https://storage.googleapis.com/mediapipe-assets/wasm/vision_wasm_internal.js"
+    echo [下载] vision_wasm_internal.js ^(@%TASKS_VER%^) ...
+    curl -L --fail --retry 3 -o "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_internal.js" "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@%TASKS_VER%/wasm/vision_wasm_internal.js"
 ) else ( echo [跳过] vision_wasm_internal.js 已存在 )
 
-rem ---- 3. blaze_face_short_range.tflite ----
+rem ---- 2b. vision_wasm_internal.wasm ---- (SIMD 主文件, 第 4 步检查项; 后台 download_models.py 已钉版本下载, 此处仅兜底)
+if not exist "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_internal.wasm" (
+    echo [下载] vision_wasm_internal.wasm ^(@%TASKS_VER%^) ...
+    curl -L --fail --retry 3 -o "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_internal.wasm" "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@%TASKS_VER%/wasm/vision_wasm_internal.wasm"
+) else ( echo [跳过] vision_wasm_internal.wasm 已存在 )
+
+rem ---- 3. blaze_face_short_range.tflite ---- (模型已自带 float16/1 版本号, 无需另钉)
 if not exist "%ROOT%\Front\vendor\blaze_face_short_range.tflite" (
     echo [下载] blaze_face_short_range.tflite ...
     curl -L --fail --retry 3 -o "%ROOT%\Front\vendor\blaze_face_short_range.tflite" "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite"
 ) else ( echo [跳过] blaze_face_short_range.tflite 已存在 )
 
-rem ---- 4. 非 SIMD 降级文件（可选） ----
+rem ---- 4. 非 SIMD 降级文件（可选, 同钉 @%TASKS_VER%） ----
 if not exist "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_nosimd_internal.js" (
-    echo [下载] vision_wasm_nosimd_internal.js ...
-    curl -L --fail --retry 3 -o "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_nosimd_internal.js" "https://storage.googleapis.com/mediapipe-assets/wasm/vision_wasm_nosimd_internal.js"
+    echo [下载] vision_wasm_nosimd_internal.js ^(@%TASKS_VER%^) ...
+    curl -L --fail --retry 3 -o "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_nosimd_internal.js" "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@%TASKS_VER%/wasm/vision_wasm_nosimd_internal.js"
 ) else ( echo [跳过] vision_wasm_nosimd_internal.js 已存在 )
 
 if not exist "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_nosimd_internal.wasm" (
-    echo [下载] vision_wasm_nosimd_internal.wasm ...
-    curl -L --fail --retry 3 -o "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_nosimd_internal.wasm" "https://storage.googleapis.com/mediapipe-assets/wasm/vision_wasm_nosimd_internal.wasm"
+    echo [下载] vision_wasm_nosimd_internal.wasm ^(@%TASKS_VER%^) ...
+    curl -L --fail --retry 3 -o "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_nosimd_internal.wasm" "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@%TASKS_VER%/wasm/vision_wasm_nosimd_internal.wasm"
 ) else ( echo [跳过] vision_wasm_nosimd_internal.wasm 已存在 )
 
 echo [2/4] 依赖与模型均就绪。
@@ -288,7 +299,7 @@ exit /b 1
 
 :get_ip
 set "LOCAL_IP="
-if exist "%ROOT%\testIp.py" for /f "delims=" %%a in ('"%PYTHON%" "%ROOT%\testIp.py" 2^>nul') do (
+if exist "%ROOT%/tools/get_lan_ip.py" for /f "delims=" %%a in ('"%PYTHON%" "%ROOT%/tools/get_lan_ip.py" 2^>nul') do (
   if not defined LOCAL_IP set "LOCAL_IP=%%a"
 )
 if not defined LOCAL_IP for /f "tokens=2 delims=:" %%a in ('ipconfig 2^>nul ^| findstr "IPv4"') do (

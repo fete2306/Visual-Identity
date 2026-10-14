@@ -129,7 +129,7 @@
     return { name: one.name, sim: one.sim, serverTime: r.serverTime, rttMs: r.rttMs };
   }
 
-  // ---- 浏览器: 摄像头循环推理 (对标 base1.solve 的跳帧+节流思想) ----
+  // ---- 浏览器: 摄像头循环推理 (对标 Back.solve 的跳帧+节流思想) ----
   const state = { stream: null, timer: null, inflight: false, faceDetector: null, failCount: 0,
                   identity: { name: "?", sim: 0 }, deviceId: "" }; // 最近一次 /infer/batch 结果,画在最大人脸框上
   // 帧率表: renderFps=overlay rAF 实测(对标 py 版 show_fps), inferFps=captureAndInfer 成功节拍

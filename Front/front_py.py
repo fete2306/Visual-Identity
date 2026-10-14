@@ -1,7 +1,7 @@
 """
-Front/front_py.py — Python 版前端 (参考 base1.FaceCheckWithMediapipe, 识别走后端 app.py /infer/batch)
+Front/front_py.py — Python 版前端 (参考 Back.FaceCheckWithMediapipe, 识别走后端 app.py /infer/batch)
 
-逻辑对照 base1.FaceCheckWithMediapipe.solve():
+逻辑对照 Back.FaceCheckWithMediapipe.solve():
   本地做: 摄像头采集 / SCRFD detect() / Mediapipe hands.process() / IoU复用 / 跳帧 / 可视化
   远端做: 原来 solve() 里 self.FaceRecognition.getFaceTensor+match 的部分,
           改为把人脸 crop JPEG 编码后 POST 到后端 /infer/batch, 用返回的 (name, sim) 显示.
@@ -23,7 +23,7 @@ Front/front_py.py — Python 版前端 (参考 base1.FaceCheckWithMediapipe, 识
    自签验签默认用 ../certs/cert.pem, 对不上加 --no-verify 跳过.
 
  可视化: 绿色框=人脸检测框(标签 name:sim), 蓝色点线=手部21关键点骨架.
- 帧率: 默认叠加 FPS/det/infer/hand (对标 base1.solve show_fps, --no-show-fps 可关).
+  帧率: 默认叠加 FPS/det/infer/hand (对标 Back.solve show_fps, --no-show-fps 可关).
 """
 
 import os
@@ -42,7 +42,7 @@ except ImportError:
 
 from Back import FaceCheckWithMediapipe
 
-# 让 Front/ 下的脚本能 import 到项目根目录的 base1 / app
+# 让 Front/ 下的脚本能 import 到项目根目录的 Back / app
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 21点手部骨架连线 (与 mediapipe solutions HAND_CONNECTIONS 一致, tasks后端同样适用)

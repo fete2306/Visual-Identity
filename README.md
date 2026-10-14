@@ -51,7 +51,8 @@ Visual-Identity_r/
 │   └── demo_hand_mouse.py  # 手势鼠标示例
 └── tools/
     ├── download_models.py  # 模型并行补全（大小 + SHA256 双校验）
-    └── gen_cert.py         # 自签证书签发
+    ├── gen_cert.py         # 自签证书签发
+    └── get_lan_ip.py       # 取本机局域网 IP（setup.bat 签证书 SAN / start.bat 回显用）
 ```
 
 以下目录/文件在运行时生成或由 `setup.bat` 补全，不随仓库提交，不在上表列出：
@@ -64,7 +65,7 @@ Visual-Identity_r/
 - `.virun`（`.gitignore` 忽略，`setup.bat` 写入的 Python 路径配置）
 - `__pycache__/`、`.vscode/`（`.gitignore` 忽略）
 
-本地文件（`.git/info/exclude`，仅本机存在，不进仓库）：`Https/`、`base.py`、`base1.py`（同名命中含 `dev/base1.py`）、`testIp.py`。
+本地文件（`.git/info/exclude`，仅本机存在，不进仓库）：`Https/`、`base.py`、`base1.py`（同名命中含 `dev/base1.py`）。
 
 ## 快速启动
 

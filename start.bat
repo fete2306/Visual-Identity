@@ -49,13 +49,13 @@ pause
 exit /b 1
 
 :local
-if not exist "%ROOT%\base1.py" (
-  echo [提示] 本地流程需要 base1.py ^(本地文件, 不在仓库中^)。
+if not exist "%ROOT%\Back.py" (
+  echo [提示] 本地流程需要 back.py ^(本地文件, 不在仓库中^)。
   pause
   exit /b 1
 )
 echo 启动本地 Base流程 (摄像头直采+识别, 无网络传输; q退出, s录入人脸) ...
-"%PYTHON%" "%ROOT%\base1.py"
+"%PYTHON%" "%ROOT%\Back.py"
 goto :end
 
 :demo_mouse
@@ -74,7 +74,7 @@ exit /b 0
 
 :get_ip
 set "LOCAL_IP="
-if exist "%ROOT%\testIp.py" for /f "delims=" %%a in ('"%PYTHON%" "%ROOT%\testIp.py" 2^>nul') do (
+if exist "%ROOT%/tools/get_lan_ip.py" for /f "delims=" %%a in ('"%PYTHON%" "%ROOT%/tools/get_lan_ip.py" 2^>nul') do (
   if not defined LOCAL_IP set "LOCAL_IP=%%a"
 )
 if not defined LOCAL_IP for /f "tokens=2 delims=:" %%a in ('ipconfig 2^>nul ^| findstr "IPv4"') do (

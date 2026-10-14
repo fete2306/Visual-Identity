@@ -19,15 +19,15 @@ import urllib.request
 # 版本钉死: tasks-vision==0.10.14 (wasm 大小指纹比对确认, 与 vendor 内 mjs 同版)
 _TASKS_VER = "0.10.14"
 MODEL_MANIFEST = {
-    # SCRFD 人脸检测 (base1.py 默认 det_500m, 2.5g 为高精度备选)
+    # SCRFD 人脸检测 (Back.py 默认 det_500m, 2.5g 为高精度备选)
     os.path.join("Model", "SCRFD", "det_500m.onnx"):
         "https://github.com/yakhyo/face-reidentification/releases/download/v0.0.1/det_500m.onnx",
     os.path.join("Model", "SCRFD", "det_2.5g.onnx"):
         "https://github.com/yakhyo/face-reidentification/releases/download/v0.0.1/det_2.5g.onnx",
-    # ArcFace R50 人脸识别 (base1.py FaceRecognition 默认)
+    # ArcFace R50 人脸识别 (Back.py FaceRecognition 默认)
     os.path.join("Model", "buffalo_l", "w600k_r50.onnx"):
         "https://github.com/yakhyo/face-reidentification/releases/download/v0.0.1/w600k_r50.onnx",
-    # MediaPipe 手势 (与 base1.py 内置自动下载地址一致)
+    # MediaPipe 手势 (与 Back.py 内置自动下载地址一致)
     os.path.join("Model", "hand_landmarker.task"):
         "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
     # 浏览器前端 vendor 大文件 (git忽略, 与 Model 内同名 task 内容一致)
