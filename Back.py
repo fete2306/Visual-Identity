@@ -49,7 +49,7 @@ def _make_ort_session(model_path: str, enable_mem_pattern: bool = False) -> ot.I
 
 
 class FaceRecognition:
-    def __init__(self, faceRecognitionModelPath: str = r"Model\buffalo_l\w600k_r50.onnx", faceEmbeddingsPath: str = r"Data\FaceEmbedding\test0926.npz"):
+    def __init__(self, faceRecognitionModelPath: str = r"Model\buffalo_l\w600k_r50.onnx", faceEmbeddingsPath: str = r"Data\FaceEmbedding\Default.npz"):
         # 112x112 固定输入，开 mem_pattern 没问题
         self.faceRecognitionModel = _make_ort_session(faceRecognitionModelPath, enable_mem_pattern=True)
 

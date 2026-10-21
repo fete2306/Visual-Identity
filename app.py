@@ -39,7 +39,7 @@ FaceBlob = NDArray[np.float32]       # (N,3,112,112) 输入
 FaceEmbedding = NDArray[np.float32]  # (N,512) 已L2归一输出
 FaceImage = NDArray[np.uint8]        # (H,W,3) BGR原图
 
-checker=FaceRecognition()
+checker=FaceRecognition(faceEmbeddingsPath=r"Data\FaceEmbedding\Default.npz")
 recognitionCount=20
 atexit.register(checker.save)
 
