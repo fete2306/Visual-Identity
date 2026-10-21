@@ -29,6 +29,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi import Body
 
 from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import UploadFile as StarletteUploadFile
 
 import time
 import json
@@ -88,7 +89,7 @@ async def infer_batch(request: Request, min_sim: float = 0.4):
     out = {}
     try:
         for key, val in form.multi_items()[:recognitionCount]:
-            if not isinstance(val, UploadFile):
+            if not isinstance(val, StarletteUploadFile):
                 continue
             try:
                 raw = await val.read()
@@ -114,7 +115,7 @@ async def infer_batch(request: Request, min_sim: float = 0.4):
             await form.close()  # 兜底全关: 上面漏掉的、非 UploadFile 混入的, 一次清干净
         except Exception:
             pass
-    out_ = {f"{k}": [...] for k, v in form.multi_items()[recognitionCount:] if isinstance(v, UploadFile)}
+    out_ = {f"{k}": [...] for k, v in form.multi_items()[recognitionCount:] if isinstance(v, StarletteUploadFile)}
     if out_ :
         out= out_ | out
     return {"time": time.time() - t0, "results": out}

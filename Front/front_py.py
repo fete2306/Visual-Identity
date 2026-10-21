@@ -56,9 +56,11 @@ HAND_CONNECTIONS = (
 
 
 # 身份状态预留字段字典 (与后端保留标签对齐, BGR; 后端新增保留字段只需加映射)
-# INFO绿=已识别 / WARNING黄=未知(unknow) / ERROR红=跳过失败(outOfrecognitionCount) / IDLE灰=无结果
+# INFO绿=已识别(name) / STRANGER橙=无匹配(stranger) / WARNING黄=未知(unknow) /
+# ERROR红=跳过失败(outOfrecognitionCount) / IDLE灰=无结果
 STATUS = {
     "INFO": {"color": (0, 200, 0), "label": "已识别"},
+    "STRANGER": {"color": (22, 115, 249), "label": "无匹配"},
     "WARNING": {"color": (0, 200, 200), "label": "未知"},
     "ERROR": {"color": (0, 0, 220), "label": "跳过/失败"},
     "IDLE": {"color": (160, 160, 160), "label": "无结果"},
@@ -70,6 +72,8 @@ def status_of(name: str) -> str:
         return "ERROR"
     if name == "unknow":
         return "WARNING"
+    if name == "stranger":
+        return "STRANGER"
     if not name or name == "?":
         return "IDLE"
     return "INFO"

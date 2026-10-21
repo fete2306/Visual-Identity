@@ -1,13 +1,14 @@
 """取本机局域网 IP (供 setup.bat / start.bat 的 :get_ip 调用).
 
 原理: UDP connect 只让系统选择默认出口网卡, 不真正发包;
-比解析 ipconfig 更准 (多网卡/虚拟网卡时 ipconnect 首个 IPv4 常是错的).
+比解析 ipconfig 更准 (多网卡/虚拟网卡时 ipconfig 首个 IPv4 常是错的).
 再叠一层过滤+优选: 开了 Clash TUN 等代理时默认出口会走到虚拟网卡
 (如 198.18.0.1), 手机根本连不上; 这类地址必须排除, 优选 RFC1918 内网段.
+VMware VMnet1/8 等 host-only 网卡通常是 x.x.x.1, 无 psutil 时也优先非 .1 地址.
 
 排除: 127/8 回环, 169.254/16 链路本地, 198.18/15 基准测试保留段
 (Clash TUN 虚拟网卡常用 198.18.0.1), 224+/0 组播保留.
-优选: 192.168/16 > 10/8 = 172.16/12 > 其它单播.
+优选: 192.168/16 > 10/8 = 172.16/12 > 其它单播; 同段优先非 .1.
 
 约定: 成功时 stdout 只打印一行 IP (bat 用 for /f 取首行), 不要加多余输出.
 """
@@ -19,7 +20,12 @@ _EXCLUDED_PREFIXES = ("127.", "169.254.", "198.18.", "198.19.", "0.")
 # 虚拟网卡名关键字 (VMware/Hyper-V/WSL 等也占 192.168.x, 但手机连不上;
 # 有网卡名时直接跳过, 见 psutil 分支; 纯 stdlib 分支无名可用, 靠段优选)
 _VIRTUAL_NAME_KEYWORDS = ("vmware", "vmnet", "virtualbox", "vbox", "hyper-v",
-                          "vethernet", "wsl", "loopback", "sandbox")
+                          "vethernet", "wsl", "loopback", "sandbox", "virtual",
+                          "docker", "virbr", "veth", "br-", "bluetooth",
+                          "teredo", "isatap", "tap", "tun", "vpn", "clash",
+                          "mihomo", "zerotier", "tailscale", "wireguard",
+                          "openvpn", "radmin", "npcap", "hamachi", "parallels",
+                          "qemu", "wan miniport")
 
 
 def _virtual_name(name: str) -> bool:
@@ -59,14 +65,25 @@ def _rank(ip: str) -> int:
     return 1
 
 
+def _pick(usable, default_ip: str = "") -> str:
+    # host-only 虚拟网卡地址常以 .1 结尾 (VMnet1=192.168.198.1, VMnet8=192.168.246.1);
+    # 只要还有非 .1 地址就优先非 .1, 避免手机连到虚拟网卡.
+    pool = [ip for ip in usable if not ip.endswith(".1")] or usable
+    return max(pool, key=lambda ip: _rank(ip) + (10 if ip == default_ip else 0))
+
+
 def get_local_ip() -> str:
     # 首选 psutil (有网卡名, 能点名排除 VMware/WSL 等虚拟网卡);
     # 无 psutil 时退化为 stdlib (默认出口 + getaddrinfo, 只做段过滤优选).
     try:
         import psutil
+        stats = psutil.net_if_stats()
         cands = []
         for nic, addrs in psutil.net_if_addrs().items():
             if _virtual_name(nic):
+                continue
+            st = stats.get(nic)
+            if st is not None and not getattr(st, "isup", True):
                 continue
             for a in addrs or []:
                 fam = getattr(a.family, "value", a.family)
@@ -75,7 +92,7 @@ def get_local_ip() -> str:
                         cands.append(a.address)
         usable = [c for c in dict.fromkeys(cands) if _usable(c)]
         if usable:
-            return max(usable, key=_rank)
+            return _pick(usable)
     except Exception:
         pass
     cands = []
@@ -103,7 +120,7 @@ def get_local_ip() -> str:
     if not usable:
         return "127.0.0.1"  # 连可用内网都没有时宁可回环, 也不打印连不上的虚拟 IP
     # 默认出口 IP(可用时)加权: 同段多块网卡并存时优先选真正能上网的那块
-    return max(usable, key=lambda c: _rank(c) + (10 if c == default_ip else 0))
+    return _pick(usable, default_ip)
 
 
 if __name__ == "__main__":

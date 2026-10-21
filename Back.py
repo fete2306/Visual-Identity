@@ -48,6 +48,60 @@ def _make_ort_session(model_path: str, enable_mem_pattern: bool = False) -> ot.I
         return ot.InferenceSession(model_path, sess_options=opts, providers=["CPUExecutionProvider"])
 
 
+def _load_embedding_file(path: str) -> Dict[str, FaceEmbedding]:
+    """把一个 .npz/.npy 读成 {id: (K,512)}；空库返回 {}，非字典格式报错。"""
+    obj = np.load(path, allow_pickle=True)
+    try:
+        if hasattr(obj, "files"):  # .npz
+            return {str(k): obj[k] for k in obj.files}
+        if isinstance(obj, dict):
+            return dict(obj)
+        data = obj.item()  # .npy 存 dict
+        if not isinstance(data, dict):
+            raise ValueError("不是 {id: embedding} 字典格式")
+        return dict(data)
+    finally:
+        close = getattr(obj, "close", None)
+        if callable(close):
+            close()
+
+
+def _load_face_embeddings(path: str) -> Tuple[Dict[str, FaceEmbedding], str]:
+    """加载人脸底库，返回 (db, 保存路径)。
+
+    只读取指定主库，不扫描同目录其它 .npz/.npy，避免把旧库数据混入主库。
+    主库缺失时创建空库文件；主库为空/损坏时返回空字典 {}。
+    """
+    is_dir = os.path.isdir(path)
+    db_dir = path if is_dir else (os.path.dirname(path) or ".")
+    primary = os.path.join(db_dir, "Default.npz") if is_dir else path
+
+    if not os.path.isfile(primary):
+        try:
+            os.makedirs(db_dir, exist_ok=True)
+            if primary.lower().endswith(".npy"):
+                np.save(primary, np.array({}, dtype=object), allow_pickle=True)
+            else:
+                np.savez_compressed(primary)  # 无主库时创建空库
+            print(f"[FaceRecognition] 已创建空人脸库 {primary}")
+        except Exception as e:
+            print(f"[FaceRecognition] 创建空人脸库 {primary} 失败 ({e})")
+        return {}, primary
+
+    try:
+        db = _load_embedding_file(primary)
+    except Exception as e:
+        print(f"[FaceRecognition] 主库 {primary} 为空或不可用 ({e}), 使用空人脸库")
+        return {}, primary
+
+    # 丢弃空数组项，确保“空库”就是 {}，不留下只有 key 的伪空库。
+    try:
+        db = {str(k): v for k, v in db.items() if np.asarray(v).size > 0}
+    except Exception:
+        pass
+    return (db if db else {}), primary
+
+
 class FaceRecognition:
     def __init__(self, faceRecognitionModelPath: str = r"Model\buffalo_l\w600k_r50.onnx", faceEmbeddingsPath: str = r"Data\FaceEmbedding\Default.npz"):
         # 112x112 固定输入，开 mem_pattern 没问题
@@ -56,43 +110,27 @@ class FaceRecognition:
         self.faceEmbeddingsPath=faceEmbeddingsPath
 
         self.faceModelInputName = self.faceRecognitionModel.get_inputs()[0].name  # 获取模型输入张量名，用于传入ort
-        # faceEmbeddingsPath 可能是 .npy 文件 / 目录 / 缺失, 做容错: 空库时 match 直接返回 unknow
+        # faceEmbeddingsPath 可能是 .npy 文件 / 目录 / 缺失; 统一归一成 dict, 空库时 match 直接返回 stranger
         self.G = np.zeros((0, 512), dtype=np.float32)
         self.ids: List[str] = []
-        try:
-            if os.path.isdir(self.faceEmbeddingsPath):
-                # 目录: 尝试找里面的 .npy/.npz, 没有则保持空库
-                cands = [os.path.join(self.faceEmbeddingsPath, f) for f in os.listdir(self.faceEmbeddingsPath)
-                         if f.endswith(".npy") or f.endswith(".npz")]
-                if len(cands) == 0:
-                    print(f"[FaceRecognition] {self.faceEmbeddingsPath} 为空目录, 使用空人脸库")
-                    self.faceEmbeddings = {}
-                else:
-                    self.faceEmbeddings = np.load(cands[0], allow_pickle=True)
-            else:
-                self.faceEmbeddings = np.load(self.faceEmbeddingsPath, allow_pickle=True)
-            # dict: {id: (K,512)} 或单数组
-            if hasattr(self.faceEmbeddings, "files"): # .npz
-                items = [(k, self.faceEmbeddings[k]) for k in self.faceEmbeddings.files]
-            elif isinstance(self.faceEmbeddings, dict):
-                items = self.faceEmbeddings.items()
-            else: # .npy 存 dict
-                items = self.faceEmbeddings.item().items()
-            mats, ids = [], []
-            for k, arr in items:
+        self.faceEmbeddings, self.faceEmbeddingsSavePath = _load_face_embeddings(self.faceEmbeddingsPath)
+        if not self.faceEmbeddings:
+            print(f"[FaceRecognition] {self.faceEmbeddingsPath} 为空或不可用, 使用空人脸库")
+        mats, ids = [], []
+        for k, arr in self.faceEmbeddings.items():
+            try:
                 a = np.asarray(arr, dtype=np.float32).reshape(-1, 512)
-                a /= np.linalg.norm(a, axis=1, keepdims=True) + 1e-9
-                mats.append(a)
-                ids += [k] * len(a)
-            if mats:
-                self.G = np.vstack(mats).astype(np.float32)  # Mx512，已归一
-                self.ids = ids
-        except FileNotFoundError:
-            print(f"[FaceRecognition] 未找到 {self.faceEmbeddingsPath}, 使用空人脸库")
-        except PermissionError:
-            print(f"[FaceRecognition] {self.faceEmbeddingsPath} 不可读, 使用空人脸库")
-        except Exception as e:
-            print(f"[FaceRecognition] 加载人脸库失败 ({e}), 使用空人脸库")
+            except Exception as e:
+                print(f"[FaceRecognition] 跳过异常底库项 {k} ({e})")
+                continue
+            if a.size == 0:
+                continue
+            a /= np.linalg.norm(a, axis=1, keepdims=True) + 1e-9
+            mats.append(a)
+            ids += [str(k)] * len(a)
+        if mats:
+            self.G = np.vstack(mats).astype(np.float32)  # Mx512，已归一
+            self.ids = ids
 
     def getFaceTensor(self, faceImg: FaceImage) -> FaceEmbedding:
         # 兼容任意裁剪尺寸，统一 resize 到 112x112 (ArcFace/R50 输入)
@@ -120,7 +158,7 @@ class FaceRecognition:
 
     def save(self, path: Optional[str] = None):
         if path is None:
-            path=self.faceEmbeddingsPath
+            path=self.faceEmbeddingsSavePath
         db: dict[str, list] = {}
         for pid, vec in zip(self.ids, self.G):
             db.setdefault(pid, []).append(vec)

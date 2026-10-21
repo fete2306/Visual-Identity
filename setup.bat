@@ -1,30 +1,30 @@
 @echo off
-chcp 65001 >nul
+chcp 936 >nul
 setlocal EnableExtensions
 rem ================================================================
-rem  setup.bat - ç¯å¢ƒé…ç½® (è·‘ä¸€æ¬¡å³å¯, æ¢ç¯å¢ƒæ—¶é‡è·‘)
-rem  æµç¨‹: é€‰Python(condaæ‰‹åŠ¨è¾“å…¥->å…¨å±€->å®‰è£…3.10) ->ä¿å­˜é…ç½®åˆ°.virun
-rem        ->è£…ä¾èµ–+æ¨¡å‹åå°å¹¶è¡Œè¡¥å…¨ ->è‡ªç­¾è¯ä¹¦ ->æ£€æŸ¥
-rem  ç”¨æ³•: setup.bat [condaç¯å¢ƒå]
-rem  é…ç½®ä¿å­˜åœ¨ .virun (å·²åŠ å…¥ .gitignore), start.bat åªè¯»å®ƒå¯åŠ¨
+rem  setup.bat - »·¾³ÅäÖÃ (ÅÜÒ»´Î¼´¿É, »»»·¾³Ê±ÖØÅÜ)
+rem  Á÷³Ì: Ñ¡Python(condaÊÖ¶¯ÊäÈë->È«¾Ö->°²×°3.10) ->±£´æÅäÖÃµ½.virun
+rem        ->×°ÒÀÀµ+Ä£ĞÍºóÌ¨²¢ĞĞ²¹È« ->×ÔÇ©Ö¤Êé ->¼ì²é
+rem  ÓÃ·¨: setup.bat [conda»·¾³Ãû]
+rem  ÅäÖÃ±£´æÔÚ .virun (ÒÑ¼ÓÈë .gitignore), start.bat Ö»¶ÁËüÆô¶¯
 rem ================================================================
 cd /d "%~dp0"
 set "ROOT=%CD%"
-echo é¡¹ç›®ç›®å½•: %ROOT%
+echo ÏîÄ¿Ä¿Â¼: %ROOT%
 echo.
 
 set "CONDA_ENV="
 if not "%~1"=="" set "CONDA_ENV=%~1"
 set "PYTHON="
 
-rem ============ 1. Python å®šä½ (conda åæ— æ•ˆå¯é‡è¾“; å›è½¦æˆ– global èµ°å…¨å±€) ============
+rem ============ 1. Python ¶¨Î» (conda ÃûÎŞĞ§¿ÉÖØÊä; »Ø³µ»ò global ×ßÈ«¾Ö) ============
 :pick_python
-if not defined CONDA_ENV set /p "CONDA_ENV=è¯·è¾“å…¥ conda ç¯å¢ƒå(ç›´æ¥å›è½¦åˆ™ä½¿ç”¨å…¨å±€ Python): "
+if not defined CONDA_ENV set /p "CONDA_ENV=ÇëÊäÈë conda »·¾³Ãû(Ö±½Ó»Ø³µÔòÊ¹ÓÃÈ«¾Ö Python): "
 if not defined CONDA_ENV goto :use_global_python
 if /i "%CONDA_ENV%"=="global" goto :use_global_python
 call :use_conda
 if defined PYTHON goto :python_ready
-echo [æç¤º] è¯·é‡æ–°è¾“å…¥æœ‰æ•ˆçš„ conda ç¯å¢ƒå (å›è½¦åˆ™ä½¿ç”¨å…¨å±€ Python)ã€‚
+echo [ÌáÊ¾] ÇëÖØĞÂÊäÈëÓĞĞ§µÄ conda »·¾³Ãû (»Ø³µÔòÊ¹ÓÃÈ«¾Ö Python)¡£
 echo.
 set "CONDA_ENV="
 goto :pick_python
@@ -35,33 +35,33 @@ if not defined PYTHON call :install_py310
 
 :python_ready
 if not defined PYTHON (
-  echo [é”™è¯¯] ä»æœªæ‰¾åˆ°å¯ç”¨ Python, è¯·æ‰‹åŠ¨å®‰è£… Python 3.10 åé‡è¯•ã€‚
+  echo [´íÎó] ÈÔÎ´ÕÒµ½¿ÉÓÃ Python, ÇëÊÖ¶¯°²×° Python 3.10 ºóÖØÊÔ¡£
   pause
   exit /b 1
 )
-echo [1/4] ä½¿ç”¨ Python: %PYTHON%
+echo [1/4] Ê¹ÓÃ Python: %PYTHON%
 "%PYTHON%" --version
 if errorlevel 1 (
-  echo [é”™è¯¯] è¯¥ Python æ— æ³•è¿è¡Œã€‚
+  echo [´íÎó] ¸Ã Python ÎŞ·¨ÔËĞĞ¡£
   pause
   exit /b 1
 )
 (echo %PYTHON%)>"%ROOT%\.virun"
-echo [é…ç½®] Python è·¯å¾„å·²ä¿å­˜åˆ° .virun
+echo [ÅäÖÃ] Python Â·¾¶ÒÑ±£´æµ½ .virun
 echo.
 
-rem ============ 2. ä¾èµ– + æ¨¡å‹ (é‡å æ‰§è¡Œ) ============
-rem åŸç†: ä¸¤æ­¥æ— ä¾èµ–ã€‚æ¨¡å‹ä¸‹è½½å†…éƒ¨å·²æ˜¯å¤šçº¿ç¨‹, å†ç”¨ start /b ä¸¢åå°(å³ bash çš„ `&`);
-rem       åå°å‘½ä»¤æ˜¯å•æ¡å¹²å‡€å‘½ä»¤, æ—¥å¿—/é€€å‡ºç ç”± Python è‡ªå·±è½ç›˜, ä¸æ‹¼æ¥ & > ç¬¦å·;
-rem       å‰å°è·‘ pip(è¾“å‡ºå¯è§ã€é€€å‡ºç ç›´æ¥å¯ç”¨), æœ€åç­‰æ¨¡å‹çš„ rc æ–‡ä»¶ã€‚
-echo [2/4] æ¨¡å‹åå°å¹¶è¡Œä¸‹è½½ä¸­(å¤§å°+SHA256æ ¡éªŒ, æ—¥å¿—: %TEMP%\vi_models.log) ...
+rem ============ 2. ÒÀÀµ + Ä£ĞÍ (ÖØµşÖ´ĞĞ) ============
+rem Ô­Àí: Á½²½ÎŞÒÀÀµ¡£Ä£ĞÍÏÂÔØÄÚ²¿ÒÑÊÇ¶àÏß³Ì, ÔÙÓÃ start /b ¶ªºóÌ¨(¼´ bash µÄ `&`);
+rem       ºóÌ¨ÃüÁîÊÇµ¥Ìõ¸É¾»ÃüÁî, ÈÕÖ¾/ÍË³öÂëÓÉ Python ×Ô¼ºÂäÅÌ, ²»Æ´½Ó & > ·ûºÅ;
+rem       Ç°Ì¨ÅÜ pip(Êä³ö¿É¼û¡¢ÍË³öÂëÖ±½Ó¿ÉÓÃ), ×îºóµÈÄ£ĞÍµÄ rc ÎÄ¼ş¡£
+echo [2/4] Ä£ĞÍºóÌ¨²¢ĞĞÏÂÔØÖĞ (´óĞ¡+SHA256Ğ£Ñé, ÈÕÖ¾: %TEMP%\vi_models.log) ...
 del "%TEMP%\vi_models.flag" 2>nul
 start "vi-models" /b "%PYTHON%" "%ROOT%\tools\download_models.py" --root "%ROOT%" --workers 4 --log "%TEMP%\vi_models.log" --rc-file "%TEMP%\vi_models.flag"
-echo [2/4] å®‰è£…ä¾èµ– (requirements.txt) ...
+echo [2/4] °²×°ÒÀÀµ (requirements.txt) ...
 set "PIP_RC=0"
 "%PYTHON%" -c "import fastapi,uvicorn,cv2,numpy,onnxruntime,mediapipe,requests,cryptography" >nul 2>nul
 if not errorlevel 1 (
-  echo [2/4] ä¾èµ–å·²é½å¤‡, è·³è¿‡ pip å®‰è£…ã€‚
+  echo [2/4] ÒÀÀµÒÑÆë±¸, Ìø¹ı pip °²×°¡£
   goto :pip_done
 )
 "%PYTHON%" -m pip install -r "%ROOT%\requirements.txt"
@@ -72,12 +72,12 @@ set "MLAST="
 :wait_models
 if exist "%TEMP%\vi_models.flag" goto :models_done
 for /f "delims=" %%L in ('type "%TEMP%\vi_models.log" 2^>nul') do set "MCUR=%%L"
-if defined MCUR if not "%MCUR%"=="%MLAST%" echo [æ¨¡å‹] %MCUR%
+if defined MCUR if not "%MCUR%"=="%MLAST%" echo [Ä£ĞÍ] %MCUR%
 set "MLAST=%MCUR%"
 ping -n 2 127.0.0.1 >nul
 set /a WAIT_N+=1
 if %WAIT_N% gtr 1800 (
-  echo [é”™è¯¯] æ¨¡å‹ä¸‹è½½ç­‰å¾…è¶…æ—¶, è¯·æŸ¥çœ‹ %TEMP%\vi_models.log åé‡è·‘ setup.batã€‚
+  echo [´íÎó] Ä£ĞÍÏÂÔØµÈ´ı³¬Ê±, Çë²é¿´ %TEMP%\vi_models.log ºóÖØÅÜ setup.bat¡£
   pause
   exit /b 1
 )
@@ -85,69 +85,68 @@ goto :wait_models
 :models_done
 set /p MODEL_RC=<"%TEMP%\vi_models.flag"
 if not "%PIP_RC%"=="0" (
-  echo [é”™è¯¯] ä¾èµ–å®‰è£…å¤±è´¥, è¯·æ£€æŸ¥ç½‘ç»œæˆ– pip æ¢æºåé‡è¯•ã€‚
+  echo [´íÎó] ÒÀÀµ°²×°Ê§°Ü, Çë¼ì²éÍøÂç»ò pip »»Ô´ºóÖØÊÔ¡£
   pause
   exit /b 1
 )
 if not "%MODEL_RC%"=="0" (
-  echo [é”™è¯¯] æ¨¡å‹è¡¥å…¨å¤±è´¥, æ—¥å¿—: %TEMP%\vi_models.log
+  echo [´íÎó] Ä£ĞÍ²¹È«Ê§°Ü, ÈÕÖ¾: %TEMP%\vi_models.log
   type "%TEMP%\vi_models.log"
   pause
   exit /b 1
 )
 
-if not exist "%ROOT%\Data\FaceEmbedding" mkdir "%ROOT%\Data\FaceEmbedding" 2>nul
 
 if not exist "%ROOT%\Front\vendor" mkdir "%ROOT%\Front\vendor" 2>nul
 if not exist "%ROOT%\Front\vendor\tasks-vision" mkdir "%ROOT%\Front\vendor\tasks-vision" 2>nul
 if not exist "%ROOT%\Front\vendor\tasks-vision\wasm" mkdir "%ROOT%\Front\vendor\tasks-vision\wasm" 2>nul
 
-rem å‰ç«¯ vendor ç‰ˆæœ¬é’‰æ­» (é¡»ä¸ tools/download_models.py å†… _TASKS_VER ä¿æŒä¸€è‡´;
-rem  å·²ç”¨ jsdelivr API + æœ¬åœ°æ–‡ä»¶å¤§å°é€å­—èŠ‚æ ¸å¯¹: vision_bundle.mjs=136870,
-rem  vision_wasm_internal.js=209826/wasm=9423986, nosimd js=209735/wasm=9294247, å‡ä¸º 0.10.14)
+rem Ç°¶Ë vendor °æ±¾¶¤ËÀ (ĞëÓë tools/download_models.py ÄÚ _TASKS_VER ±£³ÖÒ»ÖÂ;
+rem  ÒÑÓÃ jsdelivr API + ±¾µØÎÄ¼ş´óĞ¡Öğ×Ö½ÚºË¶Ô: vision_bundle.mjs=136870,
+rem  vision_wasm_internal.js=209826/wasm=9423986, nosimd js=209735/wasm=9294247, ¾ùÎª 0.10.14)
 set "TASKS_VER=0.10.14"
 
-rem ---- 1. vision_bundle.mjs ---- (jsdelivr é’‰ç‰ˆæœ¬, åŸæ— ç‰ˆæœ¬å· URL ä¼šæ¼‚åˆ° latest)
+rem ---- 1. vision_bundle.mjs ---- (jsdelivr ¶¤°æ±¾, Ô­ÎŞ°æ±¾ºÅ URL »áÆ¯µ½ latest)
 if not exist "%ROOT%\Front\vendor\tasks-vision\vision_bundle.mjs" (
-    echo [ä¸‹è½½] vision_bundle.mjs ^(@%TASKS_VER%^) ...
+    echo [ÏÂÔØ] vision_bundle.mjs ^(@%TASKS_VER%^) ...
     curl -L --fail --retry 3 -o "%ROOT%\Front\vendor\tasks-vision\vision_bundle.mjs" "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@%TASKS_VER%/vision_bundle.mjs"
-) else ( echo [è·³è¿‡] vision_bundle.mjs å·²å­˜åœ¨ )
+) else ( echo [Ìø¹ı] vision_bundle.mjs ÒÑ´æÔÚ )
 
-rem ---- 2. vision_wasm_internal.js ---- (åŸ storage.googleapis.com/mediapipe-assets ä¸ºæµ®åŠ¨ latest, æ”¹ jsdelivr é’‰ç‰ˆæœ¬)
+rem ---- 2. vision_wasm_internal.js ---- (Ô­ storage.googleapis.com/mediapipe-assets Îª¸¡¶¯ latest, ¸Ä jsdelivr ¶¤°æ±¾)
 if not exist "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_internal.js" (
-    echo [ä¸‹è½½] vision_wasm_internal.js ^(@%TASKS_VER%^) ...
+    echo [ÏÂÔØ] vision_wasm_internal.js ^(@%TASKS_VER%^) ...
     curl -L --fail --retry 3 -o "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_internal.js" "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@%TASKS_VER%/wasm/vision_wasm_internal.js"
-) else ( echo [è·³è¿‡] vision_wasm_internal.js å·²å­˜åœ¨ )
+) else ( echo [Ìø¹ı] vision_wasm_internal.js ÒÑ´æÔÚ )
 
-rem ---- 2b. vision_wasm_internal.wasm ---- (SIMD ä¸»æ–‡ä»¶, ç¬¬ 4 æ­¥æ£€æŸ¥é¡¹; åå° download_models.py å·²é’‰ç‰ˆæœ¬ä¸‹è½½, æ­¤å¤„ä»…å…œåº•)
+rem ---- 2b. vision_wasm_internal.wasm ---- (SIMD Ö÷ÎÄ¼ş, µÚ 4 ²½¼ì²éÏî; ºóÌ¨ download_models.py ÒÑ¶¤°æ±¾ÏÂÔØ, ´Ë´¦½ö¶µµ×)
 if not exist "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_internal.wasm" (
-    echo [ä¸‹è½½] vision_wasm_internal.wasm ^(@%TASKS_VER%^) ...
+    echo [ÏÂÔØ] vision_wasm_internal.wasm ^(@%TASKS_VER%^) ...
     curl -L --fail --retry 3 -o "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_internal.wasm" "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@%TASKS_VER%/wasm/vision_wasm_internal.wasm"
-) else ( echo [è·³è¿‡] vision_wasm_internal.wasm å·²å­˜åœ¨ )
+) else ( echo [Ìø¹ı] vision_wasm_internal.wasm ÒÑ´æÔÚ )
 
-rem ---- 3. blaze_face_short_range.tflite ---- (æ¨¡å‹å·²è‡ªå¸¦ float16/1 ç‰ˆæœ¬å·, æ— éœ€å¦é’‰)
+rem ---- 3. blaze_face_short_range.tflite ---- (Ä£ĞÍÒÑ×Ô´ø float16/1 °æ±¾ºÅ, ÎŞĞèÁí¶¤)
 if not exist "%ROOT%\Front\vendor\blaze_face_short_range.tflite" (
-    echo [ä¸‹è½½] blaze_face_short_range.tflite ...
+    echo [ÏÂÔØ] blaze_face_short_range.tflite ...
     curl -L --fail --retry 3 -o "%ROOT%\Front\vendor\blaze_face_short_range.tflite" "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite"
-) else ( echo [è·³è¿‡] blaze_face_short_range.tflite å·²å­˜åœ¨ )
+) else ( echo [Ìø¹ı] blaze_face_short_range.tflite ÒÑ´æÔÚ )
 
-rem ---- 4. é SIMD é™çº§æ–‡ä»¶ï¼ˆå¯é€‰, åŒé’‰ @%TASKS_VER%ï¼‰ ----
+rem ---- 4. ·Ç SIMD ½µ¼¶ÎÄ¼ş£¨¿ÉÑ¡, Í¬¶¤ @%TASKS_VER%£© ----
 if not exist "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_nosimd_internal.js" (
-    echo [ä¸‹è½½] vision_wasm_nosimd_internal.js ^(@%TASKS_VER%^) ...
+    echo [ÏÂÔØ] vision_wasm_nosimd_internal.js ^(@%TASKS_VER%^) ...
     curl -L --fail --retry 3 -o "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_nosimd_internal.js" "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@%TASKS_VER%/wasm/vision_wasm_nosimd_internal.js"
-) else ( echo [è·³è¿‡] vision_wasm_nosimd_internal.js å·²å­˜åœ¨ )
+) else ( echo [Ìø¹ı] vision_wasm_nosimd_internal.js ÒÑ´æÔÚ )
 
 if not exist "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_nosimd_internal.wasm" (
-    echo [ä¸‹è½½] vision_wasm_nosimd_internal.wasm ^(@%TASKS_VER%^) ...
+    echo [ÏÂÔØ] vision_wasm_nosimd_internal.wasm ^(@%TASKS_VER%^) ...
     curl -L --fail --retry 3 -o "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_nosimd_internal.wasm" "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@%TASKS_VER%/wasm/vision_wasm_nosimd_internal.wasm"
-) else ( echo [è·³è¿‡] vision_wasm_nosimd_internal.wasm å·²å­˜åœ¨ )
+) else ( echo [Ìø¹ı] vision_wasm_nosimd_internal.wasm ÒÑ´æÔÚ )
 
-echo [2/4] ä¾èµ–ä¸æ¨¡å‹å‡å°±ç»ªã€‚
+echo [2/4] ÒÀÀµÓëÄ£ĞÍ¾ù¾ÍĞ÷¡£
 echo.
 
 
-rem ============ 3. è‡ªç­¾è¯ä¹¦ ============
-echo [3/4] æ£€æŸ¥è‡ªç­¾è¯ä¹¦ ...
+rem ============ 3. ×ÔÇ©Ö¤Êé ============
+echo [3/4] ¼ì²é×ÔÇ©Ö¤Êé ...
 call :ensure_certs
 if errorlevel 1 (
   pause
@@ -155,26 +154,24 @@ if errorlevel 1 (
 )
 echo.
 
-rem ============ 4. æ£€æŸ¥ ============
-echo [4/4] æ£€æŸ¥ ...
+rem ============ 4. ¼ì²é ============
+echo [4/4] ¼ì²é ...
 
 if not exist "%ROOT%\Front\vendor\tasks-vision\wasm\vision_wasm_internal.wasm" (
-  echo [è­¦å‘Š] ç¼ºå°‘ Front\vendor wasm, æµè§ˆå™¨æ‰‹åŠ¿/æ£€æµ‹ä¸å¯ç”¨ã€‚
+  echo [¾¯¸æ] È±ÉÙ Front\vendor wasm, ä¯ÀÀÆ÷ÊÖÊÆ/¼ì²â²»¿ÉÓÃ¡£
 )
 
 if not exist "%ROOT%\Front\vendor\hand_landmarker.task" (
-  echo [è­¦å‘Š] ç¼ºå°‘ Front\vendor\hand_landmarker.task, æµè§ˆå™¨æ‰‹åŠ¿ä¸å¯ç”¨ã€‚
+  echo [¾¯¸æ] È±ÉÙ Front\vendor\hand_landmarker.task, ä¯ÀÀÆ÷ÊÖÊÆ²»¿ÉÓÃ¡£
 )
 
-if not exist "%ROOT%\Data\FaceEmbedding" echo [è­¦å‘Š] Data\FaceEmbedding (äººè„¸åº•åº“) åˆ›å»ºå¤±è´¥, å½•å…¥åŠŸèƒ½ä¸å¯ç”¨ã€‚
-
 echo.
-echo [å®Œæˆ] é…ç½®å°±ç»ª, è¿è¡Œ start.bat é€‰æ‹©æ¨¡å¼å¯åŠ¨ã€‚
+echo [Íê³É] ÅäÖÃ¾ÍĞ÷, ÔËĞĞ start.bat Ñ¡ÔñÄ£Ê½Æô¶¯¡£
 pause
 exit /b 0
 
 rem ================================================================
-rem  å­è¿‡ç¨‹
+rem  ×Ó¹ı³Ì
 rem ================================================================
 
 :use_conda
@@ -182,14 +179,14 @@ set "CONDA_ENV=%CONDA_ENV: =%"
 if "%CONDA_ENV%"=="" goto :conda_empty
 where conda >nul 2>nul
 if errorlevel 1 (
-  echo [æç¤º] æœªæ‰¾åˆ° conda å‘½ä»¤, è·³è¿‡ conda ç¯å¢ƒã€‚
+  echo [ÌáÊ¾] Î´ÕÒµ½ conda ÃüÁî, Ìø¹ı conda »·¾³¡£
   goto :conda_empty
 )
-rem ç›´æ¥å®šä½è¯¥ç¯å¢ƒçš„ python.exe (ä¸ç”¨ conda run, è¾“å‡ºå”¯ä¸€ã€æ— æ¿€æ´»å¼€é”€)
+rem Ö±½Ó¶¨Î»¸Ã»·¾³µÄ python.exe (²»ÓÃ conda run, Êä³öÎ¨Ò»¡¢ÎŞ¼¤»î¿ªÏú)
 set "CONDA_BASE="
 for /f "delims=" %%b in ('conda info --base 2^>nul') do if not defined CONDA_BASE set "CONDA_BASE=%%b"
 if not defined CONDA_BASE (
-  echo [æç¤º] conda ä¸å¯ç”¨, è·³è¿‡ conda ç¯å¢ƒã€‚
+  echo [ÌáÊ¾] conda ²»¿ÉÓÃ, Ìø¹ı conda »·¾³¡£
   goto :conda_empty
 )
 if /i "%CONDA_ENV%"=="base" (
@@ -198,16 +195,16 @@ if /i "%CONDA_ENV%"=="base" (
   set "PYTHON=%CONDA_BASE%\envs\%CONDA_ENV%\python.exe"
 )
 if not exist "%PYTHON%" (
-  echo [æç¤º] conda ç¯å¢ƒ "%CONDA_ENV%" ä¸å­˜åœ¨ã€‚å¯ç”¨ç¯å¢ƒå¦‚ä¸‹:
+  echo [ÌáÊ¾] conda »·¾³ "%CONDA_ENV%" ²»´æÔÚ¡£¿ÉÓÃ»·¾³ÈçÏÂ:
   call conda env list
   goto :conda_empty
 )
 "%PYTHON%" --version >nul 2>nul
 if errorlevel 1 (
-  echo [æç¤º] è¯¥ Python æ— æ³•è¿è¡Œ: %PYTHON%
+  echo [ÌáÊ¾] ¸Ã Python ÎŞ·¨ÔËĞĞ: %PYTHON%
   goto :conda_empty
 )
-echo [conda] å·²ä½¿ç”¨ç¯å¢ƒ "%CONDA_ENV%": %PYTHON%
+echo [conda] ÒÑÊ¹ÓÃ»·¾³ "%CONDA_ENV%": %PYTHON%
 exit /b 0
 :conda_empty
 set "CONDA_ENV="
@@ -224,77 +221,77 @@ if errorlevel 1 (
   set "PYTHON="
   exit /b 0
 )
-echo [global] ä½¿ç”¨å…¨å±€ Python: %PYTHON%
+echo [global] Ê¹ÓÃÈ«¾Ö Python: %PYTHON%
 exit /b 0
 
 :install_py310
-echo [å®‰è£…] æœªæ‰¾åˆ°å¯ç”¨ Python, å‡†å¤‡å®‰è£… Python 3.10 ...
+echo [°²×°] Î´ÕÒµ½¿ÉÓÃ Python, ×¼±¸°²×° Python 3.10 ...
 where winget >nul 2>nul
 if errorlevel 1 goto :no_winget
-echo [å®‰è£…] ä½¿ç”¨ winget å®‰è£… Python 3.10 ...
+echo [°²×°] Ê¹ÓÃ winget °²×° Python 3.10 ...
 winget install -e --id Python.Python.3.10 --accept-source-agreements --accept-package-agreements
 where python >nul 2>nul
 if errorlevel 1 goto :no_winget
 for /f "delims=" %%p in ('where python 2^>nul') do (if not defined PYTHON set "PYTHON=%%p")
 if defined PYTHON (
-  echo [å®‰è£…] winget å®‰è£…æˆåŠŸ: %PYTHON%
+  echo [°²×°] winget °²×°³É¹¦: %PYTHON%
   exit /b 0
 )
 :no_winget
-echo [å®‰è£…] æ”¹ç”¨å®˜ç½‘å®‰è£…åŒ… (python-3.10.11-amd64.exe) ...
+echo [°²×°] ¸ÄÓÃ¹ÙÍø°²×°°ü (python-3.10.11-amd64.exe) ...
 where curl >nul 2>nul
 if errorlevel 1 (
-  echo [é”™è¯¯] æ—  winget ä¹Ÿæ—  curl, è¯·æ‰‹åŠ¨å®‰è£… Python 3.10 åé‡è¯•ã€‚
+  echo [´íÎó] ÎŞ winget Ò²ÎŞ curl, ÇëÊÖ¶¯°²×° Python 3.10 ºóÖØÊÔ¡£
   exit /b 0
 )
 set "PYSETUP=%TEMP%\python-3.10.11-amd64.exe"
 curl -L -o "%PYSETUP%" "https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe"
 if errorlevel 1 (
-  echo [é”™è¯¯] å®‰è£…åŒ…ä¸‹è½½å¤±è´¥, è¯·æ‰‹åŠ¨å®‰è£… Python 3.10 åé‡è¯•ã€‚
+  echo [´íÎó] °²×°°üÏÂÔØÊ§°Ü, ÇëÊÖ¶¯°²×° Python 3.10 ºóÖØÊÔ¡£
   exit /b 0
 )
-echo [å®‰è£…] é™é»˜å®‰è£…ä¸­, è¯·ç¨å€™ ...
+echo [°²×°] ¾²Ä¬°²×°ÖĞ, ÇëÉÔºò ...
 "%PYSETUP%" /quiet InstallAllUsers=0 PrependPath=1 Include_test=0
 set "PYTHON=%LOCALAPPDATA%\Programs\Python\Python310\python.exe"
 if not exist "%PYTHON%" (
-  echo [é”™è¯¯] å®‰è£…åä»æ‰¾ä¸åˆ° python.exe, è¯·æ‰‹åŠ¨å®‰è£…åé‡è¯•ã€‚
+  echo [´íÎó] °²×°ºóÈÔÕÒ²»µ½ python.exe, ÇëÊÖ¶¯°²×°ºóÖØÊÔ¡£
   set "PYTHON="
   exit /b 0
 )
-echo [å®‰è£…] å®‰è£…æˆåŠŸ: %PYTHON%
+echo [°²×°] °²×°³É¹¦: %PYTHON%
 exit /b 0
 
 :ensure_certs
 if exist "%ROOT%\certs\key.pem" if exist "%ROOT%\certs\cert.pem" exit /b 0
-echo [è¯ä¹¦] æœªæ‰¾åˆ°è‡ªç­¾è¯ä¹¦, æ­£åœ¨è‡ªåŠ¨ç­¾å‘ ...
+echo [Ö¤Êé] Î´ÕÒµ½×ÔÇ©Ö¤Êé, ÕıÔÚ×Ô¶¯Ç©·¢ ...
 if not exist "%ROOT%\certs" mkdir "%ROOT%\certs"
 call :get_ip
-rem ---- é¦–é€‰ Python æ–¹å¼ (tools/gen_cert.py, ä¸ä¾èµ– openssl, æœ€ç¨³; ä¾èµ–è§ requirements.txt, æ­¤å¤„ä¸è£…åŒ…) ----
+rem ---- Ê×Ñ¡ Python ·½Ê½ (tools/gen_cert.py, ²»ÒÀÀµ openssl, ×îÎÈ; ÒÀÀµ¼û requirements.txt, ´Ë´¦²»×°°ü) ----
 "%PYTHON%" -c "import cryptography" >nul 2>nul
 if errorlevel 1 (
-  echo [æç¤º] ç¼ºå°‘ cryptography ^(requirements.txt æœªè£…å…¨^), æ”¹ç”¨ openssl æ–¹å¼ ...
+  echo [ÌáÊ¾] È±ÉÙ cryptography ^(requirements.txt Î´×°È«^), ¸ÄÓÃ openssl ·½Ê½ ...
   goto :cert_openssl
 )
 "%PYTHON%" "%ROOT%\tools\gen_cert.py" --out-dir "%ROOT%\certs" --ip "%LOCAL_IP%"
 if not errorlevel 1 if exist "%ROOT%\certs\key.pem" if exist "%ROOT%\certs\cert.pem" (
-  echo [è¯ä¹¦] å·²ç­¾å‘ ^(Python, SAN å« %LOCAL_IP%^).
+  echo [Ö¤Êé] ÒÑÇ©·¢ ^(Python, SAN º¬ %LOCAL_IP%^).
   exit /b 0
 )
-echo [æç¤º] Python ç­¾å‘å¤±è´¥, æ”¹ç”¨ openssl æ–¹å¼ ...
+echo [ÌáÊ¾] Python Ç©·¢Ê§°Ü, ¸ÄÓÃ openssl ·½Ê½ ...
 :cert_openssl
-rem ---- å¤‡ç”¨ openssl æ–¹å¼ (conda è‡ªå¸¦ openssl ç¼ºé»˜è®¤ cnf, ç½®ç©º OPENSSL_CONF ç»•è¿‡; å·²éªŒè¯å¯ç”¨) ----
+rem ---- ±¸ÓÃ openssl ·½Ê½ (conda ×Ô´ø openssl È±Ä¬ÈÏ cnf, ÖÃ¿Õ OPENSSL_CONF ÈÆ¹ı; ÒÑÑéÖ¤¿ÉÓÃ) ----
 where openssl >nul 2>nul
 if errorlevel 1 (
-  echo [é”™è¯¯] ä¸¤ç§ç­¾å‘æ–¹å¼å‡ä¸å¯ç”¨, è¯·æ‰‹åŠ¨æ”¾ç½® certs\key.pem + cert.pem åé‡è¯•ã€‚
+  echo [´íÎó] Á½ÖÖÇ©·¢·½Ê½¾ù²»¿ÉÓÃ, ÇëÊÖ¶¯·ÅÖÃ certs\key.pem + cert.pem ºóÖØÊÔ¡£
   exit /b 1
 )
 set "OPENSSL_CONF=NUL"
 openssl req -x509 -newkey rsa:2048 -keyout "%ROOT%\certs\key.pem" -out "%ROOT%\certs\cert.pem" -days 825 -nodes -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:%LOCAL_IP%"
 if not errorlevel 1 if exist "%ROOT%\certs\key.pem" if exist "%ROOT%\certs\cert.pem" (
-  echo [è¯ä¹¦] å·²ç­¾å‘ ^(openssl, SAN å« %LOCAL_IP%^).
+  echo [Ö¤Êé] ÒÑÇ©·¢ ^(openssl, SAN º¬ %LOCAL_IP%^).
   exit /b 0
 )
-echo [é”™è¯¯] è¯ä¹¦ç­¾å‘å¤±è´¥, è¯·æ‰‹åŠ¨æ”¾ç½® certs\key.pem + cert.pem åé‡è¯•ã€‚
+echo [´íÎó] Ö¤ÊéÇ©·¢Ê§°Ü, ÇëÊÖ¶¯·ÅÖÃ certs\key.pem + cert.pem ºóÖØÊÔ¡£
 exit /b 1
 
 :get_ip
@@ -302,7 +299,9 @@ set "LOCAL_IP="
 if exist "%ROOT%/tools/get_lan_ip.py" for /f "delims=" %%a in ('"%PYTHON%" "%ROOT%/tools/get_lan_ip.py" 2^>nul') do (
   if not defined LOCAL_IP set "LOCAL_IP=%%a"
 )
-if not defined LOCAL_IP for /f "tokens=2 delims=:" %%a in ('ipconfig 2^>nul ^| findstr "IPv4"') do (
+rem ²»È¡ ipconfig Ê×¸ö IPv4: VMware VMnet1/8 ³£ÅÅÔÚÇ°Ãæ, »áÄÃµ½ 192.168.x.1 ÕâÀàĞéÄâµØÖ·¡£
+if "%LOCAL_IP%"=="127.0.0.1" set "LOCAL_IP="
+if not defined LOCAL_IP for /f "tokens=4" %%a in ('route print -4 2^>nul ^| findstr /r /c:"^ *0\.0\.0\.0 *0\.0\.0\.0"') do (
   if not defined LOCAL_IP set "LOCAL_IP=%%a"
 )
 set "LOCAL_IP=%LOCAL_IP: =%"

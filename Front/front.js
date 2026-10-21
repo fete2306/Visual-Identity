@@ -213,9 +213,11 @@
   const HAND_EDGES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
 
   // 身份状态预留字段字典 (与后端保留标签对齐; 后端新增保留字段只需在这里加一行映射)
-  // INFO绿=已识别 / WARNING黄=未知(unknow) / ERROR红=跳过失败(outOfrecognitionCount) / IDLE灰=无结果
+  // INFO绿=已识别(name) / STRANGER橙=无匹配(stranger) / WARNING黄=未知(unknow) /
+  // ERROR红=跳过失败(outOfrecognitionCount) / IDLE灰=无结果
   const STATUS = {
     INFO: { color: "#16a34a", box: "#22c55e", label: "已识别" },
+    STRANGER: { color: "#c2410c", box: "#f97316", label: "无匹配" },
     WARNING: { color: "#ca8a04", box: "#eab308", label: "未知" },
     ERROR: { color: "#dc2626", box: "#ef4444", label: "跳过/失败" },
     IDLE: { color: "#9ca3af", box: "#9ca3af", label: "无结果" },
@@ -223,6 +225,7 @@
   function statusOf(name) {
     if (name === "outOfrecognitionCount") return "ERROR";
     if (name === "unknow") return "WARNING";
+    if (name === "stranger") return "STRANGER";
     if (!name || name === "?") return "IDLE";
     return "INFO";
   }
@@ -982,7 +985,7 @@
     const video = typeof document !== "undefined" && document.getElementById("video");
     let blob = null, desc = "";
     if (video && state.stream && video.readyState >= 2 && video.videoWidth) {
-      const fresh = saveCache.blobs.length && performance.now() - saveCache.ts < 15000;
+      const fresh = saveCache.blobs.length && performance.now() - saveCache.ts < 180000;
       if (!fresh) {
         await previewSave();
         if (!saveCache.blobs.length) return;

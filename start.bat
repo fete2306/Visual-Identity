@@ -1,11 +1,11 @@
 @echo off
-chcp 65001 >nul
+chcp 936 >nul
 setlocal EnableExtensions
 rem ================================================================
-rem  start.bat - çº¯åŠŸèƒ½å…¥å£ (é…ç½®è§ setup.bat, Python è·¯å¾„è¯» .virun)
-rem  1) HTTPS - å±€åŸŸç½‘å†…éƒ¨ç½² (å‰ç«¯å…¨ç«™ HTTPS)
-rem  2) æœ¬åœ° - Baseæµç¨‹ (æ‘„åƒå¤´ç›´é‡‡è¯†åˆ«, æ— ç½‘ç»œä¼ è¾“)
-rem  3/4) dev demo (æ‰‹åŠ¿é¼ æ ‡ / äººè„¸ç­¾åˆ°)
+rem  start.bat - ´¿¹¦ÄÜÈë¿Ú (ÅäÖÃ¼û setup.bat, Python Â·¾¶¶Á .virun)
+rem  1) HTTPS - ¾ÖÓòÍøÄÚ²¿Êð (Ç°¶ËÈ«Õ¾ HTTPS)
+rem  2) ±¾µØ - BaseÁ÷³Ì (ÉãÏñÍ·Ö±²ÉÊ¶±ð, ÎÞÍøÂç´«Êä)
+rem  3/4) dev demo (ÊÖÊÆÊó±ê / ÈËÁ³Ç©µ½)
 rem ================================================================
 cd /d "%~dp0"
 set "ROOT=%CD%"
@@ -18,17 +18,17 @@ if errorlevel 1 goto :no_setup
 goto :menu
 
 :no_setup
-echo [é”™è¯¯] æœªæ‰¾åˆ°å¯ç”¨ Python é…ç½®, è¯·å…ˆè¿è¡Œ setup.bat å®Œæˆé…ç½®ã€‚
+echo [´íÎó] Î´ÕÒµ½¿ÉÓÃ Python ÅäÖÃ, ÇëÏÈÔËÐÐ setup.bat Íê³ÉÅäÖÃ¡£
 pause
 exit /b 1
 
 :menu
-echo [start] ä½¿ç”¨ Python: %PYTHON%
-echo   1) HTTPS - å±€åŸŸç½‘å†…éƒ¨ç½² (è¯ä¹¦ç¼ºå¤±è¯·å…ˆè·‘ setup.bat ç­¾å‘, æŽ¨è)
-echo   2) æœ¬åœ° - Baseæµç¨‹ (æ‘„åƒå¤´ç›´é‡‡è¯†åˆ«, æ— ç½‘ç»œä¼ è¾“)
-echo   3) DEMO  - æ‰‹åŠ¿é¼ æ ‡ (å³æ‰‹é£ŸæŒ‡ç›¸å¯¹ä½ç§», qé€€å‡º)
-echo   4) DEMO  - äººè„¸ç­¾åˆ° (sqlite è½åº“, qé€€å‡º)
-choice /c 1234 /n /m "è¯·è¾“å…¥ 1-4: "
+echo [start] Ê¹ÓÃ Python: %PYTHON%
+echo   1) HTTPS - ¾ÖÓòÍøÄÚ²¿Êð (Ö¤ÊéÈ±Ê§ÇëÏÈÅÜ setup.bat Ç©·¢, ÍÆ¼ö)
+echo   2) ±¾µØ - BaseÁ÷³Ì (ÉãÏñÍ·Ö±²ÉÊ¶±ð, ÎÞÍøÂç´«Êä)
+echo   3) DEMO  - ÊÖÊÆÊó±ê (ÓÒÊÖÊ³Ö¸Ïà¶ÔÎ»ÒÆ, qÍË³ö)
+echo   4) DEMO  - ÈËÁ³Ç©µ½ (sqlite Âä¿â, qÍË³ö)
+choice /c 1234 /n /m "ÇëÊäÈë 1-4: "
 if errorlevel 4 goto :demo_att
 if errorlevel 3 goto :demo_mouse
 if errorlevel 2 goto :local
@@ -38,33 +38,33 @@ goto :https
 if not exist "%ROOT%\certs\key.pem" goto :no_cert
 if not exist "%ROOT%\certs\cert.pem" goto :no_cert
 call :get_ip
-echo æ­£åœ¨å¯åŠ¨ HTTPS æœåŠ¡, æµè§ˆå™¨è®¿é—®: https://%LOCAL_IP%:8060/front/front.html
-echo æŽ¥å£æ–‡æ¡£: https://%LOCAL_IP%:8060/docs (å…ˆä¿¡ä»»è‡ªç­¾è¯ä¹¦)
+echo ÕýÔÚÆô¶¯ HTTPS ·þÎñ, ä¯ÀÀÆ÷·ÃÎÊ: https://%LOCAL_IP%:8060/front/front.html
+echo ½Ó¿ÚÎÄµµ: https://%LOCAL_IP%:8060/docs (ÏÈÐÅÈÎ×ÔÇ©Ö¤Êé)
 "%PYTHON%" -m uvicorn app:app --host 0.0.0.0 --port 8060 --ssl-keyfile certs\key.pem --ssl-certfile certs\cert.pem
 goto :end
 
 :no_cert
-echo [é”™è¯¯] ç¼ºå°‘ certs\key.pem / cert.pem, è¯·å…ˆè¿è¡Œ setup.bat è‡ªåŠ¨ç­¾å‘ã€‚
+echo [´íÎó] È±ÉÙ certs\key.pem / cert.pem, ÇëÏÈÔËÐÐ setup.bat ×Ô¶¯Ç©·¢¡£
 pause
 exit /b 1
 
 :local
 if not exist "%ROOT%\Back.py" (
-  echo [æç¤º] æœ¬åœ°æµç¨‹éœ€è¦ back.py ^(æœ¬åœ°æ–‡ä»¶, ä¸åœ¨ä»“åº“ä¸­^)ã€‚
+  echo [ÌáÊ¾] ±¾µØÁ÷³ÌÐèÒª back.py ^(±¾µØÎÄ¼þ, ²»ÔÚ²Ö¿âÖÐ^)¡£
   pause
   exit /b 1
 )
-echo å¯åŠ¨æœ¬åœ° Baseæµç¨‹ (æ‘„åƒå¤´ç›´é‡‡+è¯†åˆ«, æ— ç½‘ç»œä¼ è¾“; qé€€å‡º, så½•å…¥äººè„¸) ...
+echo Æô¶¯±¾µØ BaseÁ÷³Ì (ÉãÏñÍ·Ö±²É+Ê¶±ð, ÎÞÍøÂç´«Êä; qÍË³ö, sÂ¼ÈëÈËÁ³) ...
 "%PYTHON%" "%ROOT%\Back.py"
 goto :end
 
 :demo_mouse
-echo å¯åŠ¨æ‰‹åŠ¿é¼ æ ‡ demo (qé€€å‡º, må¼€å…³é¼ æ ‡, fåˆ‡æ¢å·¦å³æ‰‹) ...
+echo Æô¶¯ÊÖÊÆÊó±ê demo (qÍË³ö, m¿ª¹ØÊó±ê, fÇÐ»»×óÓÒÊÖ) ...
 "%PYTHON%" "%ROOT%\dev\demo_hand_mouse.py"
 goto :end
 
 :demo_att
-echo å¯åŠ¨ç­¾åˆ° demo (qé€€å‡º, è®°å½•å†™å…¥ dev\attendance.db) ...
+echo Æô¶¯Ç©µ½ demo (qÍË³ö, ¼ÇÂ¼Ð´Èë dev\attendance.db) ...
 "%PYTHON%" "%ROOT%\dev\demo_attendance.py"
 goto :end
 
@@ -77,10 +77,10 @@ set "LOCAL_IP="
 if exist "%ROOT%/tools/get_lan_ip.py" for /f "delims=" %%a in ('"%PYTHON%" "%ROOT%/tools/get_lan_ip.py" 2^>nul') do (
   if not defined LOCAL_IP set "LOCAL_IP=%%a"
 )
-rem è„šæœ¬å›žçŽ¯è¡¨ç¤ºæ— å¯ç”¨å†…ç½‘(æˆ–è¢« Clash TUN ç­‰è™šæ‹Ÿç½‘å¡é¡¶æŽ‰é»˜è®¤å‡ºå£), å†ç”¨ ipconfig å…œåº•ä¸€æ¬¡;
-rem å…œåº•åŒæ ·è¿‡æ»¤è™šæ‹Ÿ/é“¾è·¯æœ¬åœ°ç½‘æ®µ (198.18/198.19 ç³» Clash TUN, 169.254 ç³»æœªèŽ· DHCP)ã€‚
+rem ½Å±¾»Ø»·±íÊ¾ÎÞ¿ÉÓÃÄÚÍø(»ò±» Clash TUN µÈÐéÄâÍø¿¨¶¥µôÄ¬ÈÏ³ö¿Ú), ÔÙÓÃÄ¬ÈÏÂ·ÓÉÍø¿¨¶µµ×Ò»´Î;
+rem ²»È¡ ipconfig Ê×¸ö IPv4: VMware VMnet1/8 ³£ÅÅÔÚÇ°Ãæ, »áÄÃµ½ 192.168.x.1 ÕâÀàÐéÄâµØÖ·¡£
 if "%LOCAL_IP%"=="127.0.0.1" set "LOCAL_IP="
-if not defined LOCAL_IP for /f "tokens=2 delims=:" %%a in ('ipconfig 2^>nul ^| findstr "IPv4" ^| findstr /v "169.254 198.18 198.19 127.0.0.1"') do (
+if not defined LOCAL_IP for /f "tokens=4" %%a in ('route print -4 2^>nul ^| findstr /r /c:"^ *0\.0\.0\.0 *0\.0\.0\.0"') do (
   if not defined LOCAL_IP set "LOCAL_IP=%%a"
 )
 set "LOCAL_IP=%LOCAL_IP: =%"
