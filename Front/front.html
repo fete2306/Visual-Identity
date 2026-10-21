@@ -22,8 +22,6 @@
 </head>
 <body>
 <h2>Visual-Identity 前端 <small style="color:#666">HTML 版 → POST <code>/infer/batch</code></small></h2>
-<p>Https 同源版: 后端与本页同域 (页面 <code>/front/front.html</code>, 接口 <code>/infer/*</code>)。后端启动 (cwd=项目根): <code>D:\conda\envs\cuda128\python.exe -m uvicorn Https.app:app --host 0.0.0.0 --port 8060 --ssl-keyfile certs\key.pem --ssl-certfile certs\cert.pem</code>。先开同域 <code>/docs</code> 点“继续前往”完成自签信任; 局域网用本机LAN IP(后端启动日志会打印)替换 127.0.0.1。识别走后端,检测框与手部点在本地画(对标 py 版)。</p>
-
 <div class="row">
   <label>后端: <input type="text" id="server" value="https://127.0.0.1:8060" /></label>
   <label>min_sim: <input type="range" id="minSim" min="0" max="1" step="0.05" value="0.4"
@@ -32,7 +30,7 @@
 </div>
 <div class="row">
   <label>间隔(ms): <input type="text" id="interval" value="800" style="width:80px" /></label>
-  <label><input type="checkbox" id="useCrop" checked /> 本地裁剪全部人脸一次送检(对标 py 版 detect)</label>
+  <label><input type="checkbox" id="useCrop" checked /> 本地裁剪当前帧全部人脸一次送检</label>
 </div>
 <div class="row">
   <label>人脸检测间隔(ms): <input type="text" id="faceInterval" value="120" style="width:70px" /></label>
@@ -62,8 +60,8 @@
   <label>姓名: <input type="text" id="saveName" placeholder="如 zhangsan" style="width:120px" /></label>
   <label>编号: <input type="text" id="saveIdx" value="0" style="width:40px" title="与下方预览图 #i / 识别结果 #i 同一编号(本帧检测顺序)" /></label>
   <button onclick="FrontJS.previewSave()">预览本帧人脸并编号</button>
-  <button onclick="FrontJS.onSave()">录入选中人脸(→POST /infer/save)</button>
-  <span style="font-size:12px;color:#666">对标 Back.solve 按 s: 先输名→全部人脸编号显示→按编号存入; 未开摄像头时录入送文件整图(适合单人照)</span>
+  <button onclick="FrontJS.onSave()">录入选中人脸</button>
+  <span style="font-size:12px;color:#666">先输名→全部人脸编号显示→按编号存入; 未开摄像头时录入送文件整图(适合单人照)</span>
 </div>
 <div class="row" id="savePreview" style="gap:4px;min-height:0"></div>
 
