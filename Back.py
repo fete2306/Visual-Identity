@@ -156,6 +156,29 @@ class FaceRecognition:
         self.G = np.vstack([self.G, q]).astype(np.float32)
         self.ids.append(person_id)
 
+    def delFace(self, person_id: str):
+        # 1. 找到所有匹配 person_id 的索引
+        # 使用列表推导式比纯 Python 循环更快，且能一次性获取所有匹配项（同一个人可能有多张人脸数据）
+        indices_to_remove = [i for i, pid in enumerate(self.ids) if pid == person_id]
+        
+        # 2. 如果没有找到该 ID，直接返回（或抛出异常，视需求而定）
+        if not indices_to_remove:
+            print(f"[FaceRecognition] 未找到 Person ID: {person_id}")
+            return
+
+        # 3. 构建布尔掩码
+        # 创建一个全为 True 的数组，然后将需要删除的索引位置设为 False
+        mask = np.ones(len(self.ids), dtype=bool)
+        mask[indices_to_remove] = False
+
+        # 4. 应用掩码过滤 self.G 和 self.ids
+        self.G = self.G[mask]
+        # 需要将 numpy 数组转换回 list，因为 __init__ 中 self.ids 的类型是 List[str]
+        self.ids = list(np.array(self.ids)[mask])
+        
+        print(f"[FaceRecognition] 已删除 Person ID: {person_id} 及其 {len(indices_to_remove)} 条人脸特征")
+
+
     def save(self, path: Optional[str] = None):
         if path is None:
             path=self.faceEmbeddingsSavePath

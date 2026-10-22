@@ -190,3 +190,23 @@ async def infer_save(img: UploadFile = File(...), name: str = ""):
                     img.file.close()
             except Exception:
                 pass
+
+@app.post("/infer/del")
+async def infer_del(name: str = ""):
+    t0 = time.time()
+    name = (name or "").strip()
+    if not name:
+        return JSONResponse({"ok": False, "error": "name 为空"}, status_code=400)
+    try:
+        checker.delFace(name)
+    finally:
+        pass
+    save_warning = None
+    try:
+        checker.save()  # 主动落盘一次, 崩溃也不丢本次录入; 正常退出时 atexit 再存
+    except Exception as e:
+        save_warning = str(e)
+    out = {"ok": True, "name": name, "total": len(checker.ids), "time": time.time() - t0}
+    if save_warning:
+        out["save_warning"] = save_warning
+    return out
